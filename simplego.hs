@@ -5,13 +5,6 @@ import Data.Maybe
 import Text.ParserCombinators.Parsec
 import Data.List
 
--- Utility
-
-anyElement :: Set a -> Maybe a
-anyElement s
-    | Set.null s = Nothing
-    | otherwise = Just $ head $ Set.elems s
-
 
 -- Points represent intersections on the board
 
@@ -43,22 +36,13 @@ opposingColor Black = White
 
 -- Chains are sets of points which share liberties
 
-data Chain = Chain (Set Point) deriving (Show, Ord, Eq)
-
-toList :: Chain -> [Point]
-toList (Chain pts) = Set.toList pts
-
-toSet :: Chain -> Set Point
-toSet (Chain pts) = pts
+type Chain = Set Point
 
 joinChains :: Set Chain -> Chain
-joinChains = Chain . Set.foldr (\ch a -> Set.union (toSet ch) a) Set.empty
-
-appendToChain :: Point -> Chain -> Chain
-appendToChain pt (Chain st) = Chain (Set.insert pt st)
+joinChains = Set.foldr Set.union Set.empty
 
 surroundingPoints :: Int -> Chain -> Set Point
-surroundingPoints n (Chain pts) = (Set.unions $ map (adjacentPoints n) (Set.toList pts)) Set.\\ pts
+surroundingPoints n ch = (Set.unions $ map (adjacentPoints n) (Set.toList ch)) Set.\\ ch
 
 
 -- Positions represent the state of the board
@@ -76,7 +60,7 @@ chainsOfColor Black = blackChains
 
 -- Collect all the points occupied by a given color
 allOfColor :: Color -> Position -> Set Point
-allOfColor color = toSet . joinChains . chainsOfColor color
+allOfColor color = joinChains . chainsOfColor color
 
 -- Collect all the occupied positions
 allOccupied :: Position -> Set Point
@@ -98,7 +82,7 @@ positionByPlaying color pt pos
     | color == Black = Position (size pos) merged (whiteChains pos)
     where 
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
-        merged = Set.insert (appendToChain pt (joinChains withLiberty)) withoutLiberty
+        merged = Set.insert (Set.insert pt (joinChains withLiberty)) withoutLiberty
         -- Find the chains that don't have pt as a liberty
         withoutLiberty = (chainsOfColor color pos) Set.\\ withLiberty
         -- Find the chains that have pt as a liberty
