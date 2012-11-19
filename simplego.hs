@@ -27,7 +27,7 @@ allowedPoint n (Point (x, y)) = (x > 0) && (y > 0) && (x <= n) && (y <= n)
 
 -- Get all the adjacent points of a given point on the specified sized board
 adjacentPoints :: Int -> Point -> Set Point
-adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (\x -> pt `addPoint` x) directions
+adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (addPoint pt) directions
     where directions = [Point (0, 1), Point (1, 0), Point (0, -1), Point (-1, 0)]
 
 
@@ -36,9 +36,9 @@ adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (\x -> pt `ad
 data Color = White | Black deriving (Eq, Show)
 
 -- Get the opposing color
-otherColor :: Color -> Color
-otherColor White = Black
-otherColor Black = White
+opposingColor :: Color -> Color
+opposingColor White = Black
+opposingColor Black = White
 
 
 -- Chains are sets of points which share liberties
@@ -52,7 +52,7 @@ toSet :: Chain -> Set Point
 toSet (Chain pts) = pts
 
 joinChains :: Set Chain -> Chain
-joinChains st = Chain $ Set.foldr (\ch a -> Set.union (toSet ch) a) Set.empty st
+joinChains = Chain . Set.foldr (\ch a -> Set.union (toSet ch) a) Set.empty
 
 appendToChain :: Point -> Chain -> Chain
 appendToChain pt (Chain st) = Chain (Set.insert pt st)
@@ -76,7 +76,7 @@ chainsOfColor Black = blackChains
 
 -- Collect all the points occupied by a given color
 allOfColor :: Color -> Position -> Set Point
-allOfColor color pos = toSet $ joinChains $ chainsOfColor color pos
+allOfColor color = toSet . joinChains . chainsOfColor color
 
 -- Collect all the occupied positions
 allOccupied :: Position -> Set Point
@@ -84,7 +84,7 @@ allOccupied pos = Set.union (allOfColor White pos) (allOfColor Black pos)
 
 -- Find all the liberties of a given chain
 libertiesOfChain :: Color -> Chain -> Position -> Set Point
-libertiesOfChain color ch pos = (surroundingPoints (size pos) ch) Set.\\ allOfColor (otherColor color) pos
+libertiesOfChain color ch pos = (surroundingPoints (size pos) ch) Set.\\ allOfColor (opposingColor color) pos
 
 -- Determine which chains have a point as a liberty
 chainsWithLiberty :: Color -> Point -> Position -> Set Chain
@@ -111,22 +111,27 @@ positionByRemoving Black ch (Position n bs ws) = Position n (Set.delete ch bs) w
 
 
 prettyPrintPosition :: Position -> String
-prettyPrintPosition pos = intercalate "\n" (map printRow [1 .. (size pos)])
+prettyPrintPosition pos = intercalate "\n" (map stringForRow indices)
   where
-    printRow x = map (\y -> charFor x y) [1 .. (size pos)]
-    charFor x y = case (Set.member (Point (x, y)) allBls, Set.member (Point (x, y)) allWhts) of
-        (True, False) -> '•'
-        (False, True) -> 'o'
+    stringForRow x = intersperse ' ' $ map (charForPoint x) indices
+    charForPoint x y = case (Set.member pt allBls, Set.member pt allWhts) of
+        (True, False) -> '●'
+        (False, True) -> '○'
         otherwise -> '+'
+      where
+        pt = Point (x, y)
     allBls = allOfColor Black pos
     allWhts = allOfColor White pos
+    indices = [1 .. (size pos)]
+
 
 -- A Ruleset gives the rules of play
 
 data NoPlayReason = InvalidPlay | GameOver
 data Ruleset = Ruleset { 
-    firstToPlay :: Color, 
-    positionForPlay :: Color -> Maybe Point -> Game -> Either NoPlayReason Position }
+    firstToPlay :: Color,
+    positionForPlay :: Color -> Maybe Point -> Game -> Either NoPlayReason Position 
+}
 
 instance Show Ruleset where
     show rules = "<ruleset>"
@@ -138,7 +143,6 @@ defaultPositionForPlay _ Nothing (Game _ (h1:h2:hs) _)
     | h1 == h2 = Left GameOver
     | otherwise = Right h1
 defaultPositionForPlay _ Nothing (Game _ (h:hs) _) = Right h
-
 -- Handle normal plays
 defaultPositionForPlay color (Just pt) game
     -- Determine if the point is off the board
@@ -151,11 +155,11 @@ defaultPositionForPlay color (Just pt) game
     | otherwise = Right newPos
     where
         newPos = removeCaptured $ positionByPlaying color pt (head (history game))
-        removeCaptured pos = Set.foldl (\curr ch -> positionByRemoving (otherColor color) ch curr) pos (capturedBy color pos)
+        removeCaptured pos = Set.foldl (\curr ch -> positionByRemoving (opposingColor color) ch curr) pos (capturedBy color pos)
 
 -- The default ruleset's way of determining captures
 capturedBy :: Color -> Position -> Set Chain
-capturedBy color pos = Set.filter (\ch -> Set.null (libertiesOfChain (otherColor color) ch pos)) (chainsOfColor (otherColor color) pos)
+capturedBy color pos = Set.filter (\ch -> Set.null (libertiesOfChain (opposingColor color) ch pos)) (chainsOfColor (opposingColor color) pos)
 
 -- The default, standard ruleset
 defaultRules = Ruleset Black defaultPositionForPlay
@@ -175,7 +179,7 @@ stepGame _ gm@(Game _ _ Nothing) = (False, gm)
 -- Otherwise try to play at the point
 stepGame pt gm@(Game r h (Just t)) = case (positionForPlay r t pt gm) of
     -- The play was valid and returned a new position
-    Right pos -> (True, Game r (pos:h) $ Just (otherColor t))
+    Right pos -> (True, Game r (pos:h) $ Just (opposingColor t))
     -- The play was invalid
     Left InvalidPlay -> (False, gm)
     -- The play resulted in the end of the game
@@ -207,13 +211,15 @@ getPoint = do
         Left _ -> do
             putStrLn "Invalid input. Try again."
             getPoint
-        
+
+printMostRecentPosition :: Game -> IO ()
+printMostRecentPosition = putStrLn . prettyPrintPosition . head . history
 
 interactGame :: Game -> IO ()
 -- Is the game over?
-interactGame gm@(Game _ _ Nothing) = putStrLn "Game over."
+interactGame gm@(Game _ _ Nothing) = (printMostRecentPosition gm) >> putStrLn "Game over."
 interactGame gm@(Game _ _ (Just color)) = do
-    putStrLn $ prettyPrintPosition $ head (history gm)
+    printMostRecentPosition gm
     putStrLn $ (show color) ++ " to play. (Return to pass.)"
     pt <- getPoint
     case stepGame pt gm of
