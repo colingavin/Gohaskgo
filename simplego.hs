@@ -15,20 +15,20 @@ anyElement s
 
 -- Points represent intersections on the board
 
-data Point = Point (Int, Int) deriving (Show, Eq, Ord, Read)
+type Point = (Int, Int)
 
 -- Utility to add two points together coordinant-wise
 addPoint :: Point -> Point -> Point
-addPoint (Point (ax, ay)) (Point (bx, by)) = Point (ax + bx, ay + by)
+addPoint (ax, ay) (bx, by) = (ax + bx, ay + by)
 
 -- Utility to determine if a point is allowed on a given sized board
 allowedPoint :: Int -> Point -> Bool
-allowedPoint n (Point (x, y)) = (x > 0) && (y > 0) && (x <= n) && (y <= n)
+allowedPoint n (x, y) = (x > 0) && (y > 0) && (x <= n) && (y <= n)
 
 -- Get all the adjacent points of a given point on the specified sized board
 adjacentPoints :: Int -> Point -> Set Point
 adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (addPoint pt) directions
-    where directions = [Point (0, 1), Point (1, 0), Point (0, -1), Point (-1, 0)]
+    where directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
 
 -- The colors of the players
@@ -119,7 +119,7 @@ prettyPrintPosition pos = intercalate "\n" (map stringForRow indices)
         (False, True) -> '○'
         otherwise -> '+'
       where
-        pt = Point (x, y)
+        pt = (x, y)
     allBls = allOfColor Black pos
     allWhts = allOfColor White pos
     indices = [1 .. (size pos)]
@@ -195,7 +195,7 @@ actualPair = do
     char ','
     spaces
     y <- (many1 digit)
-    return $ Just $ Point ((read x), (read y))
+    return $ Just $ (read x, read y)
 
 onlyReturn :: GenParser Char st (Maybe Point)
 onlyReturn = (string "") >> (return Nothing)
