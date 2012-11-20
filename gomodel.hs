@@ -101,23 +101,23 @@ positionByRemoving Empty _ pos = pos
 scorePosition :: Position -> (Int, Int)
 scorePosition pos = (scoreColor Black, scoreColor White)
   where
-    scoreColor color = scoreEmptyChains emptyChains color + Set.size (allOfColor color pos)
+    allPts = Set.fromList ([(x,y) | x <- [1 .. size pos], y <- [1 .. size pos]] :: [(Int, Int)])
+    emptyChains = emptyConnectedRegions [] (allPts Set.\\ allOccupied pos) pos
     scoreEmptyChains chs color = foldr ((+) . Set.size) 0 matchedChains
       where
         matchedChains = filter isInTerritory chs
         isInTerritory ch = Set.null $ Set.intersection (allOfColor (opposingColor color) pos) (surroundingPoints (size pos) ch)
-    emptyChains = scorePosition' [] (allPts Set.\\ allOccupied pos) pos
-    allPts = Set.fromList ([(x,y) | x <- [1..(size pos)], y <- [1..(size pos)]] :: [(Int, Int)])
+    scoreColor color = scoreEmptyChains emptyChains color + Set.size (allOfColor color pos)
 
 -- Inner method for score calculation: 
     -- [Chain] is the empty chains so far created 
     -- Set Point is the set of unconsidered empty points
-scorePosition' :: [Chain] -> Set Point -> Position -> [Chain]
-scorePosition' chs emp pos
+emptyConnectedRegions :: [Chain] -> Set Point -> Position -> [Chain]
+emptyConnectedRegions chs emp pos
     -- If there are no empty points to consider, just return what we have
     | Set.null emp = chs
     -- Otherwise, pick an arbitrary point in the empty set and expand it
-    | otherwise = scorePosition' (expanded:chs) (emp Set.\\ expanded) pos
+    | otherwise = emptyConnectedRegions (expanded:chs) (emp Set.\\ expanded) pos
   where
     expanded = expandEmptyPoint (Set.singleton (head (Set.toList emp))) pos
 
