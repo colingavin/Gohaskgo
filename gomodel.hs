@@ -26,12 +26,13 @@ adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (addPoint pt)
 
 -- The colors of the players
 
-data Color = White | Black deriving (Eq, Show)
+data Color = White | Black | Empty deriving (Eq, Show)
 
 -- Get the opposing color
 opposingColor :: Color -> Color
 opposingColor White = Black
 opposingColor Black = White
+opposingColor Empty = Empty
 
 
 -- Chains are sets of points which share liberties
@@ -57,6 +58,7 @@ emptyPosition n = Position n  Set.empty Set.empty
 chainsOfColor :: Color -> Position -> Set Chain
 chainsOfColor White = whiteChains
 chainsOfColor Black = blackChains
+chainsOfColor Empty = \pos -> Set.union (whiteChains pos) (blackChains pos)
 
 -- Collect all the points occupied by a given color
 allOfColor :: Color -> Position -> Set Point
@@ -80,6 +82,7 @@ positionByPlaying color pt pos
     | not $ allowedPoint (size pos) pt = error "Cannot play that point."
     | color == White = Position (size pos) (blackChains pos) merged
     | color == Black = Position (size pos) merged (whiteChains pos)
+    | otherwise = pos
     where 
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
         merged = Set.insert (Set.insert pt (joinChains withLiberty)) withoutLiberty
@@ -91,7 +94,39 @@ positionByPlaying color pt pos
 -- Create a new position by removing a given chain
 positionByRemoving :: Color -> Chain -> Position -> Position
 positionByRemoving White ch (Position n bs ws) = Position n bs (Set.delete ch ws)
-positionByRemoving Black ch (Position n bs ws) = Position n (Set.delete ch bs) ws 
+positionByRemoving Black ch (Position n bs ws) = Position n (Set.delete ch bs) ws
+positionByRemoving Empty _ pos = pos
+
+-- Calculates the chinese score of the position for (Black, White)
+scorePosition :: Position -> (Int, Int)
+scorePosition pos = (scoreColor Black, scoreColor White)
+  where
+    scoreColor color = scoreEmptyChains emptyChains color + Set.size (allOfColor color pos)
+    scoreEmptyChains chs color = foldr ((+) . Set.size) 0 matchedChains
+      where
+        matchedChains = filter isInTerritory chs
+        isInTerritory ch = Set.null $ Set.intersection (allOfColor (opposingColor color) pos) (surroundingPoints (size pos) ch)
+    emptyChains = scorePosition' [] (allPts Set.\\ allOccupied pos) pos
+    allPts = Set.fromList ([(x,y) | x <- [1..(size pos)], y <- [1..(size pos)]] :: [(Int, Int)])
+
+-- Inner method for score calculation: 
+    -- [Chain] is the empty chains so far created 
+    -- Set Point is the set of unconsidered empty points
+scorePosition' :: [Chain] -> Set Point -> Position -> [Chain]
+scorePosition' chs emp pos
+    -- If there are no empty points to consider, just return what we have
+    | Set.null emp = chs
+    -- Otherwise, pick an arbitrary point in the empty set and expand it
+    | otherwise = scorePosition' (expanded:chs) (emp Set.\\ expanded) pos
+  where
+    expanded = expandEmptyPoint (Set.singleton (head (Set.toList emp))) pos
+
+expandEmptyPoint :: Chain -> Position -> Chain
+expandEmptyPoint ch pos
+    | Set.null libs = ch
+    | otherwise = expandEmptyPoint (Set.union ch libs) pos
+  where
+    libs = libertiesOfChain Empty ch pos
 
 
 prettyPrintPosition :: Position -> String
@@ -169,6 +204,5 @@ stepGame pt gm@(Game r h (Just t)) = case (positionForPlay r t pt gm) of
     -- The play resulted in the end of the game
     Left GameOver -> (True, Game r h Nothing)
 
-
--- User interaction
-
+latestPosition :: Game -> Position
+latestPosition = head . history
