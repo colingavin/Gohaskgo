@@ -9,6 +9,9 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Monad.Error
 
+import Utils
+
+
 -- Go is played by two players, Black and White, some intersections on the board may be Neither
 data Player = Black | White | Neither deriving (Eq, Show, Ord, Enum)
 
@@ -49,7 +52,7 @@ surroundingPoints :: Int -> Chain -> Set Point
 surroundingPoints n ch = (Set.unions $ map (adjacentPoints n) (Set.toList ch)) Set.\\ ch
 
 removeChain :: Chain -> Array Point Player -> Array Point Player
-removeChain ch board = board // map (\pt -> (pt, Neither)) (Set.toList ch)
+removeChain ch board = board // map (flip pair Neither) (Set.toList ch)
 
 
 -- PlayErrors happen when a point cannot be played at
@@ -112,20 +115,16 @@ libertiesOfChain color ch (Position n board _ _) = Set.filter ((== Neither) . (b
 chainsWithLiberty :: Player -> Point -> Position -> Set Chain
 chainsWithLiberty color pt pos = Set.filter (\ch -> Set.member pt (libertiesOfChain color ch pos)) $ chainsForPlayer color pos
 
--- Collect all the occupied positions
-allOfColor :: Player -> Position -> Set Point
-allOfColor color = joinChains . chainsForPlayer color
-
 -- Find all the unoccupied points
-allEmptyPoints :: Position -> Set Point
-allEmptyPoints (Position _ board _ _) = Set.fromList $ filter ((== Neither) . (board !)) (indices board)
+allOfColor :: Player -> Position -> Set Point
+allOfColor color (Position _ board _ _) = Set.fromList $ filterIndices (== color) board
 
 -- Calculates the chinese score of the position for (Black, White)
 scorePosition :: Position -> (Int, Int)
 scorePosition pos@(Position n board bs ws) = (scoreColor Black, scoreColor White)
   where
     allPts = Set.fromList (indices board)
-    emptyChains = emptyConnectedRegions [] allEmptyPoints pos
+    emptyChains = emptyConnectedRegions [] (allOfColor Neither pos) pos
     scoreEmptyChains chs color = foldr ((+) . Set.size) 0 matchedChains
       where
         matchedChains = filter isInTerritory chs
@@ -182,7 +181,7 @@ data FinishedGame = FinishedGame {
 type AnyGame = Either FinishedGame IncompleteGame
 
 -- Class representing what can be done with any kind of game
-class Game a where
+class Show a => Game a where
     latestPosition :: a -> Position
     getSize :: a -> Int
     getSize = getBoardSize . latestPosition
@@ -218,7 +217,7 @@ instance PlayableGame IncompleteGame where
             else if (selfCleared `elem` hist) then throwError KoViolation
             else return $ Right $ IncompleteGame (cleared:hist) (opponent color)
 
-    emptyPoints = allEmptyPoints . latestPosition
+    emptyPoints = (allOfColor Neither) . latestPosition
 
     nextToPlay = getToPlay
 
