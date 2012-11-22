@@ -42,6 +42,14 @@ getPoint = do
 printMostRecentPosition :: Game a => a -> IO ()
 printMostRecentPosition = putStrLn . prettyPrintPosition . latestPosition
 
+playMove :: Maybe Point -> IncompleteGame -> IO ()
+playMove (Just pt) gm = case play gm pt of
+    Right ng -> interactGame $ Right ng
+    Left err -> do
+        putStrLn $ "Invalid move: " ++ (show err)
+        interactGame $ Right gm
+playMove Nothing gm = interactGame $ pass gm
+
 -- Drives the main loop of interaction
 interactGame :: AnyGame -> IO ()
 -- Is the game over?
@@ -56,12 +64,8 @@ interactGame (Left gm) = do
 -- If the game isn't over, try to get and play a point from the current player
 interactGame (Right gm) = do
     printMostRecentPosition gm
-    putStrLn $ (show (nextToPlay gm)) ++ " to play. (Return to pass.)"
-    pt <- getPoint
-    case play gm pt of
-        Right ng -> interactGame ng
-        Left err -> do
-            putStrLn $ "Invalid move: " ++ (show err)
-            interactGame (Right gm)
+    putStrLn $ (show (getToPlay gm)) ++ " to play. (Return to pass.)"
+    move <- getPoint
+    playMove move gm
 
 main = interactGame $ Right $ makeNewGame 9

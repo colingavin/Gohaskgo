@@ -172,10 +172,38 @@ data IncompleteGame = IncompleteGame {
 makeNewGame :: Int -> IncompleteGame
 makeNewGame n = IncompleteGame [emptyPosition n] Black
 
+play :: IncompleteGame -> Point -> Either PlayError IncompleteGame
+play (IncompleteGame hist color) pt = do
+    newPos <- positionByPlaying color pt (head hist)
+    let cleared = positionByClearing (opponent color) newPos
+    let selfCleared = positionByClearing color cleared
+    if selfCleared /= cleared
+        then throwError Suicide
+        else if (selfCleared `elem` hist) then throwError KoViolation
+        else return $ IncompleteGame (cleared:hist) (opponent color)
+
+pass :: IncompleteGame -> AnyGame
+pass (IncompleteGame hist color) = do
+    if length hist >= 2 && (head hist) == (head $ tail hist)
+        then Left $ FinishedGame (head hist)
+        else return $ IncompleteGame ((head hist):hist) (opponent color)
+
+emptyPoints :: IncompleteGame -> Set Point
+emptyPoints = (allOfColor Neither) . latestPosition
+
 -- FinishedGames only keep their last position, they also can be scored
 data FinishedGame = FinishedGame {
     getLastPosition :: Position
 } deriving (Show)
+
+winner :: FinishedGame -> Player
+winner gm = case (uncurry compare . score) gm of
+    LT -> White
+    EQ -> Neither
+    GT -> Black
+
+score :: FinishedGame -> (Int, Int)
+score = scorePosition . latestPosition
 
 -- Synonmy for either finished games or incomplete games, returned by 'play' function
 type AnyGame = Either FinishedGame IncompleteGame
@@ -196,39 +224,3 @@ instance Game FinishedGame where
 instance Game AnyGame where
     latestPosition (Left f) = latestPosition f
     latestPosition (Right i) = latestPosition i
-
--- PlayableGames are ones that can be played on
-class Game a => PlayableGame a where
-    play :: a -> Maybe Point -> Either PlayError AnyGame
-    emptyPoints :: a -> Set Point
-    nextToPlay :: a -> Player
-
-instance PlayableGame IncompleteGame where
-    play (IncompleteGame hist color) Nothing = do
-        if length hist > 2 && (head hist) == (head $ tail hist)
-            then return $ Left $ FinishedGame (head hist)
-            else return $ Right $ IncompleteGame ((head hist):hist) (opponent color)
-    play (IncompleteGame hist color) (Just pt) = do
-        newPos <- positionByPlaying color pt (head hist)
-        let cleared = positionByClearing (opponent color) newPos
-        let selfCleared = positionByClearing color cleared
-        if selfCleared /= cleared
-            then throwError Suicide
-            else if (selfCleared `elem` hist) then throwError KoViolation
-            else return $ Right $ IncompleteGame (cleared:hist) (opponent color)
-
-    emptyPoints = (allOfColor Neither) . latestPosition
-
-    nextToPlay = getToPlay
-
--- Scorable games are ones that can be scored
-class Game a => ScorableGame a where
-    score :: a -> (Int, Int)
-    winner :: a -> Player
-    winner gm = case (uncurry compare . score) gm of
-        LT -> White
-        EQ -> Neither
-        GT -> Black
-
-instance ScorableGame FinishedGame where
-    score = scorePosition . latestPosition
