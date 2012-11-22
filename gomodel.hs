@@ -1,13 +1,25 @@
+{-# language TypeSynonymInstances #-}
+{-# language FlexibleInstances #-}
+
 module GoModel where
 
+import Data.Array
+import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Maybe
-import Data.List
+import Control.Monad.Error
+
+-- Go is played by two players, Black and White, some intersections on the board may be Neither
+data Player = Black | White | Neither deriving (Eq, Show, Ord, Enum)
+
+-- Get the opposing Player
+opponent :: Player -> Player
+opponent White = Black
+opponent Black = White
+opponent Neither = Neither
 
 
 -- Points represent intersections on the board
-
 type Point = (Int, Int)
 
 -- Utility to add two points together coordinant-wise
@@ -23,20 +35,11 @@ adjacentPoints :: Int -> Point -> Set Point
 adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (addPoint pt) directions
     where directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
+-- Create empty board of a given size indexed by Points
+emptyBoard :: Int -> Array Point Player
+emptyBoard n = array ((1,1), (n, n)) [((x, y), Neither) | x <- [1..n], y <- [1..n]]
 
--- The colors of the players
-
-data Color = White | Black | Empty deriving (Eq, Show)
-
--- Get the opposing color
-opposingColor :: Color -> Color
-opposingColor White = Black
-opposingColor Black = White
-opposingColor Empty = Empty
-
-
--- Chains are sets of points which share liberties
-
+-- Chains are contigious sets of points
 type Chain = Set Point
 
 joinChains :: Set Chain -> Chain
@@ -45,68 +48,88 @@ joinChains = Set.foldr Set.union Set.empty
 surroundingPoints :: Int -> Chain -> Set Point
 surroundingPoints n ch = (Set.unions $ map (adjacentPoints n) (Set.toList ch)) Set.\\ ch
 
+removeChain :: Chain -> Array Point Player -> Array Point Player
+removeChain ch board = board // map (\pt -> (pt, Neither)) (Set.toList ch)
 
--- Positions represent the state of the board
 
-data Position = Position { size :: Int, blackChains :: Set Chain, whiteChains :: Set Chain } deriving (Show, Eq)
+-- PlayErrors happen when a point cannot be played at
+data PlayError = OccupiedPoint | KoViolation | Suicide | Other deriving (Show)
+
+instance Error PlayError where
+    noMsg = Other
+
+
+-- Positions are the main representation of the state of a board
+data Position = Position {
+    getBoardSize :: Int,
+    getBoard :: Array Point Player,
+    getBlackChains :: Set Chain,
+    getWhiteChains :: Set Chain
+} deriving (Eq, Show)
 
 -- Create a new, empty position
 emptyPosition :: Int -> Position
-emptyPosition n = Position n  Set.empty Set.empty
+emptyPosition n = Position n (emptyBoard n) Set.empty Set.empty
 
--- Find all the chains of a specific color
-chainsOfColor :: Color -> Position -> Set Chain
-chainsOfColor White = whiteChains
-chainsOfColor Black = blackChains
-chainsOfColor Empty = \pos -> Set.union (whiteChains pos) (blackChains pos)
-
--- Collect all the points occupied by a given color
-allOfColor :: Color -> Position -> Set Point
-allOfColor color = joinChains . chainsOfColor color
-
--- Collect all the occupied positions
-allOccupied :: Position -> Set Point
-allOccupied pos = Set.union (allOfColor White pos) (allOfColor Black pos)
-
--- Find all the liberties of a given chain
-libertiesOfChain :: Color -> Chain -> Position -> Set Point
-libertiesOfChain color ch pos = (surroundingPoints (size pos) ch) Set.\\ allOfColor (opposingColor color) pos
-
--- Determine which chains have a point as a liberty
-chainsWithLiberty :: Color -> Point -> Position -> Set Chain
-chainsWithLiberty color pt pos = Set.filter (\ch -> Set.member pt (libertiesOfChain color ch pos)) (chainsOfColor color pos)
-
--- Create a new position by playing at a point
-positionByPlaying :: Color -> Point -> Position -> Position
-positionByPlaying color pt pos
-    | not $ allowedPoint (size pos) pt = error "Cannot play that point."
-    | color == White = Position (size pos) (blackChains pos) merged
-    | color == Black = Position (size pos) merged (whiteChains pos)
-    | otherwise = pos
-    where 
+-- Play at a point with a color (note, no pattern for Neither, this should be a crash)
+positionByPlaying :: Player -> Point -> Position -> Either PlayError Position
+positionByPlaying color pt pos@(Position n board bs ws)
+    | not $ allowedPoint n pt = Left Other
+    | board ! pt /= Neither = Left OccupiedPoint
+    | color == White = Right $ Position n newBoard bs merged
+    | color == Black = Right $ Position n newBoard merged ws
+    where
+        newBoard = board // [(pt, color)]
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
         merged = Set.insert (Set.insert pt (joinChains withLiberty)) withoutLiberty
         -- Find the chains that don't have pt as a liberty
-        withoutLiberty = (chainsOfColor color pos) Set.\\ withLiberty
+        withoutLiberty = (chainsForPlayer color pos) Set.\\ withLiberty
         -- Find the chains that have pt as a liberty
         withLiberty = chainsWithLiberty color pt pos
 
--- Create a new position by removing a given chain
-positionByRemoving :: Color -> Chain -> Position -> Position
-positionByRemoving White ch (Position n bs ws) = Position n bs (Set.delete ch ws)
-positionByRemoving Black ch (Position n bs ws) = Position n (Set.delete ch bs) ws
-positionByRemoving Empty _ pos = pos
+-- Create a new position by clearing all captured chains of a given color
+positionByClearing :: Player -> Position -> Position
+positionByClearing color pos@(Position n board bs ws)
+    | color == White = Position n newBoard bs (ws Set.\\ capturedChains)
+    | color == Black = Position n newBoard (bs Set.\\ capturedChains) ws
+    | color == Neither = error "Can't clear empty."
+  where
+    capturedChains = Set.filter (\ch -> Set.null (libertiesOfChain color ch pos)) (chainsForPlayer color pos)
+    newBoard = removeChain (joinChains capturedChains) board
+
+-- Find all the chains of a specific color
+chainsForPlayer :: Player -> Position -> Set Chain
+chainsForPlayer White = getWhiteChains
+chainsForPlayer Black = getBlackChains
+-- Neither gives all chains
+chainsForPlayer Neither = \pos -> Set.union (getWhiteChains pos) (getBlackChains pos)
+
+-- Find all the liberties of a given chain
+libertiesOfChain :: Player -> Chain -> Position -> Set Point
+libertiesOfChain color ch (Position n board _ _) = Set.filter ((== Neither) . (board !)) $ surroundingPoints n ch
+
+-- Determine which chains have a point as a liberty
+chainsWithLiberty :: Player -> Point -> Position -> Set Chain
+chainsWithLiberty color pt pos = Set.filter (\ch -> Set.member pt (libertiesOfChain color ch pos)) $ chainsForPlayer color pos
+
+-- Collect all the occupied positions
+allOfColor :: Player -> Position -> Set Point
+allOfColor color = joinChains . chainsForPlayer color
+
+-- Find all the unoccupied points
+allEmptyPoints :: Position -> Set Point
+allEmptyPoints (Position _ board _ _) = Set.fromList $ filter ((== Neither) . (board !)) (indices board)
 
 -- Calculates the chinese score of the position for (Black, White)
 scorePosition :: Position -> (Int, Int)
-scorePosition pos = (scoreColor Black, scoreColor White)
+scorePosition pos@(Position n board bs ws) = (scoreColor Black, scoreColor White)
   where
-    allPts = Set.fromList ([(x,y) | x <- [1 .. size pos], y <- [1 .. size pos]] :: [(Int, Int)])
-    emptyChains = emptyConnectedRegions [] (allPts Set.\\ allOccupied pos) pos
+    allPts = Set.fromList (indices board)
+    emptyChains = emptyConnectedRegions [] allEmptyPoints pos
     scoreEmptyChains chs color = foldr ((+) . Set.size) 0 matchedChains
       where
         matchedChains = filter isInTerritory chs
-        isInTerritory ch = Set.null $ Set.intersection (allOfColor (opposingColor color) pos) (surroundingPoints (size pos) ch)
+        isInTerritory ch = Set.null $ Set.intersection (allOfColor (opponent color) pos) (surroundingPoints n ch)
     scoreColor color = scoreEmptyChains emptyChains color + Set.size (allOfColor color pos)
 
 -- Inner method for score calculation: 
@@ -119,90 +142,94 @@ emptyConnectedRegions chs emp pos
     -- Otherwise, pick an arbitrary point in the empty set and expand it
     | otherwise = emptyConnectedRegions (expanded:chs) (emp Set.\\ expanded) pos
   where
-    expanded = expandEmptyPoint (Set.singleton (head (Set.toList emp))) pos
+    expanded = expandEmptyChain (Set.singleton (head (Set.toList emp))) pos
 
-expandEmptyPoint :: Chain -> Position -> Chain
-expandEmptyPoint ch pos
+-- Take a chain consisting of empty points and expand it until it has no liberties
+expandEmptyChain :: Chain -> Position -> Chain
+expandEmptyChain ch pos
     | Set.null libs = ch
-    | otherwise = expandEmptyPoint (Set.union ch libs) pos
+    | otherwise = expandEmptyChain (Set.union ch libs) pos
   where
-    libs = libertiesOfChain Empty ch pos
+    libs = libertiesOfChain Neither ch pos
 
-
+-- Create a nice string representation of the position
 prettyPrintPosition :: Position -> String
-prettyPrintPosition pos = intercalate "\n" (map stringForRow indices)
+prettyPrintPosition (Position n board bs ws) = intercalate "\n" (map stringForRow [1 .. n])
   where
-    stringForRow x = intersperse ' ' $ map (charForPoint x) indices
-    charForPoint x y = case (Set.member pt allBls, Set.member pt allWhts) of
-        (True, False) -> '●'
-        (False, True) -> '○'
-        otherwise -> '+'
-      where
-        pt = (x, y)
-    allBls = allOfColor Black pos
-    allWhts = allOfColor White pos
-    indices = [1 .. (size pos)]
+    stringForRow x = intersperse ' ' $ map (charForPoint x) [1 .. n]
+    charForPoint x y = case board ! (x, y) of
+        Black -> '●'
+        White -> '○'
+        Neither -> '+'
 
+-- There are two different states that a game can be in, these are represented by different types
 
--- A Ruleset gives the rules of play
+-- IncompleteGames retain their history and other information, they also can be played
+data IncompleteGame = IncompleteGame {
+    getHistory :: [Position],
+    getToPlay :: Player
+} deriving (Show)
 
-data NoPlayReason = InvalidPlay | GameOver
-data Ruleset = Ruleset { 
-    firstToPlay :: Color,
-    positionForPlay :: Color -> Maybe Point -> Game -> Either NoPlayReason Position 
-}
+makeNewGame :: Int -> IncompleteGame
+makeNewGame n = IncompleteGame [emptyPosition n] Black
 
-instance Show Ruleset where
-    show rules = "<ruleset>"
+-- FinishedGames only keep their last position, they also can be scored
+data FinishedGame = FinishedGame {
+    getLastPosition :: Position
+} deriving (Show)
 
+-- Synonmy for either finished games or incomplete games, returned by 'play' function
+type AnyGame = Either FinishedGame IncompleteGame
 
-defaultPositionForPlay :: Color -> Maybe Point -> Game -> Either NoPlayReason Position
--- Handle passes
-defaultPositionForPlay _ Nothing (Game _ (h1:h2:hs) _)
-    | h1 == h2 = Left GameOver
-    | otherwise = Right h1
-defaultPositionForPlay _ Nothing (Game _ (h:hs) _) = Right h
--- Handle normal plays
-defaultPositionForPlay color (Just pt) game
-    -- Determine if the point is off the board
-    | not $ allowedPoint (size (head (history game))) pt = Left InvalidPlay
-    -- Determine if the point to be played is already occupied
-    | Set.member pt $ allOccupied (head (history game)) = Left InvalidPlay
-    -- Determine if the play violates ko
-    | elem newPos (history game) = Left InvalidPlay
-    -- Otherwise play the point
-    | otherwise = Right newPos
-    where
-        newPos = removeCaptured $ positionByPlaying color pt (head (history game))
-        removeCaptured pos = Set.foldl (\curr ch -> positionByRemoving (opposingColor color) ch curr) pos (capturedBy color pos)
+-- Class representing what can be done with any kind of game
+class Game a where
+    latestPosition :: a -> Position
+    getSize :: a -> Int
+    getSize = getBoardSize . latestPosition
 
--- The default ruleset's way of determining captures
-capturedBy :: Color -> Position -> Set Chain
-capturedBy color pos = Set.filter (\ch -> Set.null (libertiesOfChain (opposingColor color) ch pos)) (chainsOfColor (opposingColor color) pos)
+instance Game IncompleteGame where
+    latestPosition = head . getHistory
 
--- The default, standard ruleset
-defaultRules = Ruleset Black defaultPositionForPlay
+instance Game FinishedGame where
+    latestPosition = getLastPosition
 
+-- Make AnyGame an instance for convenience
+instance Game AnyGame where
+    latestPosition (Left f) = latestPosition f
+    latestPosition (Right i) = latestPosition i
 
--- A Game is a list of past positions possibly the next color to play
+-- PlayableGames are ones that can be played on
+class Game a => PlayableGame a where
+    play :: a -> Maybe Point -> Either PlayError AnyGame
+    emptyPoints :: a -> Set Point
+    nextToPlay :: a -> Player
 
-data Game = Game { rules :: Ruleset, history :: [Position], toPlay :: Maybe Color } deriving Show
+instance PlayableGame IncompleteGame where
+    play (IncompleteGame hist color) Nothing = do
+        if length hist > 2 && (head hist) == (head $ tail hist)
+            then return $ Left $ FinishedGame (head hist)
+            else return $ Right $ IncompleteGame ((head hist):hist) (opponent color)
+    play (IncompleteGame hist color) (Just pt) = do
+        newPos <- positionByPlaying color pt (head hist)
+        let cleared = positionByClearing (opponent color) newPos
+        let selfCleared = positionByClearing color cleared
+        if selfCleared /= cleared
+            then throwError Suicide
+            else if (selfCleared `elem` hist) then throwError KoViolation
+            else return $ Right $ IncompleteGame (cleared:hist) (opponent color)
 
--- Create a new, empty game of the given size
-gameWithSize :: Int -> Ruleset -> Game
-gameWithSize n rules = Game rules [emptyPosition n] $ Just (firstToPlay rules)
+    emptyPoints = allEmptyPoints . latestPosition
 
-stepGame :: Maybe Point -> Game -> (Bool, Game)
--- Test to see if the game is over
-stepGame _ gm@(Game _ _ Nothing) = (False, gm)
--- Otherwise try to play at the point
-stepGame pt gm@(Game r h (Just t)) = case (positionForPlay r t pt gm) of
-    -- The play was valid and returned a new position
-    Right pos -> (True, Game r (pos:h) $ Just (opposingColor t))
-    -- The play was invalid
-    Left InvalidPlay -> (False, gm)
-    -- The play resulted in the end of the game
-    Left GameOver -> (True, Game r h Nothing)
+    nextToPlay = getToPlay
 
-latestPosition :: Game -> Position
-latestPosition = head . history
+-- Scorable games are ones that can be scored
+class Game a => ScorableGame a where
+    score :: a -> (Int, Int)
+    winner :: a -> Player
+    winner gm = case (uncurry compare . score) gm of
+        LT -> White
+        EQ -> Neither
+        GT -> Black
+
+instance ScorableGame FinishedGame where
+    score = scorePosition . latestPosition

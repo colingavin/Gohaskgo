@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad
 import Text.ParserCombinators.Parsec
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -37,28 +38,29 @@ getPoint = do
             putStrLn "Invalid input. Try again."
             getPoint
 
-printMostRecentPosition :: Game -> IO ()
+printMostRecentPosition :: Game a => a -> IO ()
 printMostRecentPosition = putStrLn . prettyPrintPosition . latestPosition
 
 -- Drives the main loop of interaction
-interactGame :: Game -> IO ()
+interactGame :: AnyGame -> IO ()
 -- Is the game over?
-interactGame gm@(Game _ _ Nothing) = do 
+interactGame (Left gm) = do 
     (printMostRecentPosition gm)
     putStrLn "Game over."
-    let (blackScore, whiteScore) = scorePosition (latestPosition gm)
+    let (blackScore, whiteScore) = score gm
     putStrLn $ "Black: " ++ (show blackScore)
     putStrLn $ "White: " ++ (show whiteScore)
+    putStrLn $ (show $ winner gm) ++ " won."
 
 -- If the game isn't over, try to get and play a point from the current player
-interactGame gm@(Game _ _ (Just color)) = do
+interactGame (Right gm) = do
     printMostRecentPosition gm
-    putStrLn $ (show color) ++ " to play. (Return to pass.)"
+    putStrLn $ (show (nextToPlay gm)) ++ " to play. (Return to pass.)"
     pt <- getPoint
-    case stepGame pt gm of
-        (True, ng) -> interactGame ng
-        (False, _) -> do
-            putStrLn "Invalid move."
-            interactGame gm
+    case play gm pt of
+        Right ng -> interactGame ng
+        Left err -> do
+            putStrLn $ "Invalid move: " ++ (show err)
+            interactGame (Right gm)
 
-main = interactGame $ gameWithSize 9 defaultRules
+main = interactGame $ Right $ makeNewGame 9
