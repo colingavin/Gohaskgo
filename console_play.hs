@@ -20,7 +20,7 @@ actualPair = do
     return $ Just $ (read x, read y)
 
 onlyReturn :: Parser (Maybe Point)
-onlyReturn = (string "") >> (return Nothing)
+onlyReturn = (string "\n") >> (return Nothing)
 
 commaSeparatedPoint :: Parser (Maybe Point)
 commaSeparatedPoint = actualPair <|> onlyReturn
@@ -32,8 +32,9 @@ commaSeparatedPoint = actualPair <|> onlyReturn
 getPoint :: IO (Maybe Point)
 getPoint = do
     inPt <- getLine
-    case parse commaSeparatedPoint "" inPt of
-        Right result -> return result
+    case parse commaSeparatedPoint "" (inPt ++ "\n") of
+        Right result -> do
+            return result
         Left _ -> do
             putStrLn "Invalid input. Try again."
             getPoint
