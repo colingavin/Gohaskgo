@@ -64,6 +64,7 @@ interactGame (Left gm) = do
 -- If the game isn't over, try to get and play a point from the current player
 interactGame (Right gm) = do
     printMostRecentPosition gm
+    print $ latestPosition gm
     putStrLn $ (show (getToPlay gm)) ++ " to play. (Return to pass.)"
     move <- getPoint
     playMove move gm
