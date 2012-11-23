@@ -31,20 +31,28 @@ type PlayoutHeuristic = Set Point -> IncompleteGame -> (Set Point, Set Point)
 
 -- All the playout heuristics to try in order, may be weighted later
 allPlayoutHeuristics :: [PlayoutHeuristic]
-allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic]
+allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic]
 
 -- Heuristic to avoid self atari
 selfAtariHeuristic :: PlayoutHeuristic
-selfAtariHeuristic ps gm = (Set.empty, Set.filter (isSelfAtari gm) ps)
+selfAtariHeuristic ps gm = (Set.empty, Set.filter isSelfAtari ps)
   where
-    isSelfAtari gm p = not $ Set.null $ Set.filter (\ch -> Set.size (libertiesOfChain player ch pos) == 2) (chainsWithLiberty player p pos)
+    isSelfAtari p = not $ Set.null $ Set.filter (\ch -> Set.size (libertiesOfChain player ch pos) == 2) (chainsWithLiberty player p pos)
     pos = latestPosition gm
     player = getToPlay gm
 
 -- Heuristic to capture opposing stones
 captureHeuristic :: PlayoutHeuristic
-captureHeuristic ps gm = (Set.filter (isCapture gm) ps, Set.empty)
+captureHeuristic ps gm = (Set.filter isCapture ps, Set.empty)
   where
-    isCapture gm p = not $ Set.null $ Set.filter (\ch -> Set.size (libertiesOfChain opp ch pos) == 1) (chainsWithLiberty opp p pos)
+    isCapture p = not $ Set.null $ Set.filter (\ch -> Set.size (libertiesOfChain opp ch pos) == 1) (chainsWithLiberty opp p pos)
     pos = latestPosition gm
     opp = opponent $ getToPlay gm
+
+-- Heuristic to avoid playing on lines 1 and 2
+linesHeuristic :: PlayoutHeuristic
+linesHeuristic ps gm = (Set.empty, Set.filter isOnBadLine ps)
+  where
+    isOnBadLine (x, y) = x == 1 || y == 1 || x == 2 || y == 2 || x == boardSize || y == boardSize || x == boardSize - 1 || y == boardSize - 1
+    boardSize = getSize gm
+
