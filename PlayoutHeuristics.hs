@@ -6,6 +6,7 @@ import Debug.Trace (trace)
 
 import Utils
 import GoModel
+import PositionAnalysis
 
 -- Access point to playout heurisitcs
 -- Given a set of open points and a game, groups the moves into good, fair, and bad, to be tried in order
@@ -48,16 +49,20 @@ selfAtariHeuristic ps gm = (Set.empty, trace (show (getToPlay gm) ++ ": " ++  (s
 
 -- Heuristic to capture opposing stones
 captureHeuristic :: PlayoutHeuristic
-captureHeuristic ps gm = (Set.filter isCapture ps, Set.empty)
+captureHeuristic ps gm = (Set.intersection capturePoints ps, Set.empty)
   where
-    isCapture p = not $ Set.null $ Set.filter (\ch -> Set.size (getLiberties ch) == 1) (chainsWithLiberty opp p pos)
+    capturePoints = flattenSet $ Set.map capturePoint (chainsForPlayer opp pos)
     pos = latestPosition gm
     opp = opponent $ getToPlay gm
 
 -- Heuristic to avoid playing on lines 1 and 2
-linesHeuristic :: PlayoutHeuristic
-linesHeuristic ps gm = (Set.empty, Set.filter isOnBadLine ps)
+badPointsForSize :: [Set Point]
+badPointsForSize = map badPoints [0..]
   where
-    isOnBadLine (x, y) = x == 1 || y == 1 || x == 2 || y == 2 || x == boardSize || y == boardSize || x == boardSize - 1 || y == boardSize - 1
-    boardSize = getSize gm
+    badPoints n = Set.filter (isOnBadLine n) $ Set.fromList [(x, y) | x <- [1..n], y <- [1..n]]
+    isOnBadLine n (x, y) = x == 1 || y == 1 || x == 2 || y == 2 || x == n || y == n || x == n - 1 || y == n - 1
 
+linesHeuristic :: PlayoutHeuristic
+linesHeuristic ps gm = (Set.empty, Set.intersection (badPointsForSize !! boardSize) ps)
+  where
+    boardSize = getSize gm
