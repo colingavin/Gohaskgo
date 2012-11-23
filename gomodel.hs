@@ -33,10 +33,16 @@ addPoint (ax, ay) (bx, by) = (ax + bx, ay + by)
 allowedPoint :: Int -> Point -> Bool
 allowedPoint n (x, y) = (x > 0) && (y > 0) && (x <= n) && (y <= n)
 
+-- Memoize the lists of adjacent points
+adjacentPointsArrays :: [Array Point (Set Point)]
+adjacentPointsArrays = map adjacentPointsArray [0..]
+  where
+    adjacentPointsArray n = array ((1, 1), (n, n)) $ [((x, y), adjacentPoints' n x y) | x <- [1..n], y <- [1..n]]
+    adjacentPoints' n x y = Set.fromList $ filter (allowedPoint n) $ [(x, y + 1), (x + 1, y), (x, y - 1), (x - 1, 0)]
+
 -- Get all the adjacent points of a given point on the specified sized board
 adjacentPoints :: Int -> Point -> Set Point
-adjacentPoints n pt = Set.fromList $ filter (allowedPoint n) $ map (addPoint pt) directions
-    where directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+adjacentPoints n pt = (adjacentPointsArrays !! n) ! pt
 
 -- Create empty board of a given size indexed by Points
 emptyBoard :: Int -> Array Point Player
@@ -159,34 +165,38 @@ prettyPrintPosition (Position n board bs ws) = intercalate "\n" (map stringForRo
     charForPoint x y = case board ! (x, y) of
         Black -> '●'
         White -> '○'
-        Neither -> '+'
+        Neither -> ' '
 
 -- There are two different states that a game can be in, these are represented by different types
 
 -- IncompleteGames retain their history and other information, they also can be played
 data IncompleteGame = IncompleteGame {
     getHistory :: [Position],
-    getToPlay :: Player
+    getToPlay :: Player,
+    getLastWasPass :: Bool
 } deriving (Show)
 
 makeNewGame :: Int -> IncompleteGame
-makeNewGame n = IncompleteGame [emptyPosition n] Black
+makeNewGame n = IncompleteGame [emptyPosition n] Black False
 
 play :: IncompleteGame -> Point -> Either PlayError IncompleteGame
-play (IncompleteGame hist color) pt = do
+play (IncompleteGame hist color _) pt = do
     newPos <- positionByPlaying color pt (head hist)
     let cleared = positionByClearing (opponent color) newPos
     let selfCleared = positionByClearing color cleared
     if selfCleared /= cleared
         then throwError Suicide
         else if (selfCleared `elem` hist) then throwError KoViolation
-        else return $ IncompleteGame (cleared:hist) (opponent color)
+        else return $ IncompleteGame (cleared:hist) (opponent color) False
 
 pass :: IncompleteGame -> AnyGame
-pass (IncompleteGame hist color) = do
-    if length hist >= 2 && (head hist) == (head $ tail hist)
-        then Left $ FinishedGame (head hist)
-        else return $ IncompleteGame ((head hist):hist) (opponent color)
+pass (IncompleteGame (h:hs) color p) = do
+    if p
+        then Left $ FinishedGame h
+        else return $ IncompleteGame (h:h:hs) (opponent color) True
+
+resign :: IncompleteGame -> FinishedGame
+resign (IncompleteGame (h:hs) _ _) = FinishedGame h
 
 emptyPoints :: IncompleteGame -> Set Point
 emptyPoints = (allOfColor Neither) . latestPosition
