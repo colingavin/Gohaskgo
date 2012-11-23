@@ -18,6 +18,10 @@ classifyMoves ps gm = (good, ps Set.\\ (Set.union good bad), bad)
 maxPlayoutLength :: [Int]
 maxPlayoutLength = map ((*3) . (^2)) [1..]
 
+-- Tests a game to see if passing now (and thereby ending the game) would result in a win
+shouldPassToWin :: IncompleteGame -> Bool
+shouldPassToWin gm = (winner $ resign gm) == getToPlay gm
+
 -- Tests a game to determine if the opponent has all-but-won
 shouldResign :: IncompleteGame -> Bool
 shouldResign gm = opponentsCount - playersCount > (getSize gm)^2 `div` 2 || (length $ (getHistory gm)) > maxPlayoutLength !! (getSize gm)
@@ -33,7 +37,7 @@ type PlayoutHeuristic = Set Point -> IncompleteGame -> (Set Point, Set Point)
 allPlayoutHeuristics :: [PlayoutHeuristic]
 allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic]
 
--- Heuristic to avoid self atari
+-- Heuristic to avoid self atari (TODO: This isn't actually correct because it doesn't account for the liberties created by playing)
 selfAtariHeuristic :: PlayoutHeuristic
 selfAtariHeuristic ps gm = (Set.empty, Set.filter isSelfAtari ps)
   where

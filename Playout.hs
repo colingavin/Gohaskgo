@@ -3,6 +3,7 @@ module Main where
 import Control.Monad
 import Data.Random
 import Data.Random.Source.DevRandom
+import System.Random.MWC (create)
 import System.Random
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -23,6 +24,7 @@ makeRandomMoveFrom ps gm = do
 
 makeRandomMove :: IncompleteGame -> RVar AnyGame
 --makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
+makeRandomMove gm | getLastWasPass gm && shouldPassToWin gm = return $ pass gm
 makeRandomMove gm | shouldResign gm = return $ Left $ resign gm
 makeRandomMove gm = do
     goodMove <- makeRandomMoveFrom (Set.toList good) gm
@@ -42,10 +44,9 @@ randomWinner :: AnyGame -> RVar Player
 randomWinner gm = randomPlayout gm >>= (return . winner)
 
 main = do
-
     let emptyGame = Right $ makeNewGame 9
     let afterRand = randomPlayout emptyGame
     let randWin = randomWinner emptyGame
-    putStrLn "Random game:"
+    mwc <- create
     a <- sampleFrom DevURandom afterRand
     putStrLn $ prettyPrintPosition $ latestPosition a
