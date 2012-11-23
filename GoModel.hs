@@ -64,7 +64,7 @@ surroundingPoints :: Int -> Set Point -> Set Point
 surroundingPoints n ps = (Set.unions $ map (adjacentPoints n) (Set.toList ps)) Set.\\ ps
 
 libertiesOnBoard :: Int -> Set Point -> Array Point Player -> Set Point
-libertiesOnBoard n ch board = Set.filter ((== Neither) . (board !)) $ surroundingPoints n ch
+libertiesOnBoard n ps board = Set.foldr Set.union Set.empty $ Set.map (\p -> Set.filter ((== Neither) . (board !)) (adjacentPoints n p)) ps
 
 removeChain :: Chain -> Array Point Player -> Array Point Player
 removeChain (Chain ps _) board = board // map (flip pair Neither) (Set.toList ps)
@@ -199,10 +199,10 @@ play :: IncompleteGame -> Point -> Either PlayError IncompleteGame
 play (IncompleteGame hist color _) pt = do
     newPos <- positionByPlaying color pt (head hist)
     let cleared = positionByClearing (opponent color) newPos
-    let selfCleared = positionByClearing color cleared
-    if selfCleared /= cleared
+    let selfCapture = any (Set.null . getLiberties) $ Set.toList (chainsForPlayer color cleared)
+    if selfCapture
         then throwError Suicide
-        else if (selfCleared `elem` hist) then throwError KoViolation
+        else if (cleared `elem` hist) then throwError KoViolation
         else return $ IncompleteGame (cleared:hist) (opponent color) False
 
 pass :: IncompleteGame -> AnyGame
