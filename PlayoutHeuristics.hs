@@ -37,7 +37,7 @@ allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic]
 selfAtariHeuristic :: PlayoutHeuristic
 selfAtariHeuristic ps gm = (Set.empty, Set.filter isSelfAtari ps)
   where
-    isSelfAtari p = not $ Set.null $ Set.filter (\ch -> Set.size (libertiesOfChain player ch pos) == 2) (chainsWithLiberty player p pos)
+    isSelfAtari p = not $ Set.null $ Set.filter (\ch -> Set.size (getLiberties ch) == 2) (chainsWithLiberty player p pos)
     pos = latestPosition gm
     player = getToPlay gm
 
@@ -45,7 +45,7 @@ selfAtariHeuristic ps gm = (Set.empty, Set.filter isSelfAtari ps)
 captureHeuristic :: PlayoutHeuristic
 captureHeuristic ps gm = (Set.filter isCapture ps, Set.empty)
   where
-    isCapture p = not $ Set.null $ Set.filter (\ch -> Set.size (libertiesOfChain opp ch pos) == 1) (chainsWithLiberty opp p pos)
+    isCapture p = not $ Set.null $ Set.filter (\ch -> Set.size (getLiberties ch) == 1) (chainsWithLiberty opp p pos)
     pos = latestPosition gm
     opp = opponent $ getToPlay gm
 

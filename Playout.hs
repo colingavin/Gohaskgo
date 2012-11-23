@@ -22,7 +22,7 @@ makeRandomMoveFrom ps gm = do
         Left _ -> makeRandomMoveFrom (dropIndex ps idx) gm
 
 makeRandomMove :: IncompleteGame -> RVar AnyGame
-makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
+--makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
 makeRandomMove gm | shouldResign gm = return $ Left $ resign gm
 makeRandomMove gm = do
     goodMove <- makeRandomMoveFrom (Set.toList good) gm

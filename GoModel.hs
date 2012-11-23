@@ -8,6 +8,7 @@ import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Monad.Error
+import Debug.Trace (trace)
 
 import Utils
 
@@ -49,16 +50,24 @@ emptyBoard :: Int -> Array Point Player
 emptyBoard n = array ((1,1), (n, n)) [((x, y), Neither) | x <- [1..n], y <- [1..n]]
 
 -- Chains are contigious sets of points
-type Chain = Set Point
+data Chain = Chain {
+    getPoints :: Set Point,
+    getLiberties :: Set Point
+} deriving (Show, Eq, Ord)
 
 joinChains :: Set Chain -> Chain
-joinChains = Set.foldr Set.union Set.empty
+joinChains = Set.foldr joinPair (Chain Set.empty Set.empty)
+  where
+    joinPair (Chain ps ls) (Chain ps' ls') = Chain (Set.union ps ps') (Set.union ls ls')
 
-surroundingPoints :: Int -> Chain -> Set Point
-surroundingPoints n ch = (Set.unions $ map (adjacentPoints n) (Set.toList ch)) Set.\\ ch
+surroundingPoints :: Int -> Set Point -> Set Point
+surroundingPoints n ps = (Set.unions $ map (adjacentPoints n) (Set.toList ps)) Set.\\ ps
+
+libertiesOnBoard :: Int -> Set Point -> Array Point Player -> Set Point
+libertiesOnBoard n ch board = Set.filter ((== Neither) . (board !)) $ surroundingPoints n ch
 
 removeChain :: Chain -> Array Point Player -> Array Point Player
-removeChain ch board = board // map (flip pair Neither) (Set.toList ch)
+removeChain (Chain ps _) board = board // map (flip pair Neither) (Set.toList ps)
 
 
 -- PlayErrors happen when a point cannot be played at
@@ -85,25 +94,37 @@ positionByPlaying :: Player -> Point -> Position -> Either PlayError Position
 positionByPlaying color pt pos@(Position n board bs ws)
     | not $ allowedPoint n pt = Left Other
     | board ! pt /= Neither = Left OccupiedPoint
-    | color == White = Right $ Position n newBoard bs merged
-    | color == Black = Right $ Position n newBoard merged ws
+    | color == White = Right $ Position n newBoard (updateLiberties Black newBoard n bs) merged
+    | color == Black = Right $ Position n newBoard merged (updateLiberties White newBoard n ws)
     where
         newBoard = board // [(pt, color)]
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
-        merged = Set.insert (Set.insert pt (joinChains withLiberty)) withoutLiberty
+        merged = Set.insert (insertPoint pt color board n (joinChains withLiberty)) withoutLiberty
         -- Find the chains that don't have pt as a liberty
         withoutLiberty = (chainsForPlayer color pos) Set.\\ withLiberty
         -- Find the chains that have pt as a liberty
         withLiberty = chainsWithLiberty color pt pos
 
+-- Insert a point into a chain and update its liberties
+insertPoint :: Point -> Player -> Array Point Player -> Int -> Chain -> Chain
+insertPoint p color board n (Chain ps _) = Chain newPoints (libertiesOnBoard n newPoints board)
+  where
+    newPoints = Set.insert p ps
+
+-- Update the liberties of the chains of a given color
+updateLiberties :: Player -> Array Point Player -> Int -> Set Chain -> Set Chain
+updateLiberties color board n chs = Set.map updateOne chs
+  where
+    updateOne (Chain ps _) = Chain ps (libertiesOnBoard n ps board)
+
 -- Create a new position by clearing all captured chains of a given color
 positionByClearing :: Player -> Position -> Position
 positionByClearing color pos@(Position n board bs ws)
-    | color == White = Position n newBoard bs (ws Set.\\ capturedChains)
-    | color == Black = Position n newBoard (bs Set.\\ capturedChains) ws
+    | color == White = Position n newBoard (updateLiberties Black newBoard n bs) (ws Set.\\ capturedChains)
+    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newBoard n ws)
     | color == Neither = error "Can't clear empty."
   where
-    capturedChains = Set.filter (\ch -> Set.null (libertiesOfChain color ch pos)) (chainsForPlayer color pos)
+    capturedChains = Set.filter (\ch -> Set.null (getLiberties ch)) (chainsForPlayer color pos)
     newBoard = removeChain (joinChains capturedChains) board
 
 -- Find all the chains of a specific color
@@ -113,13 +134,9 @@ chainsForPlayer Black = getBlackChains
 -- Neither gives all chains
 chainsForPlayer Neither = \pos -> Set.union (getWhiteChains pos) (getBlackChains pos)
 
--- Find all the liberties of a given chain
-libertiesOfChain :: Player -> Chain -> Position -> Set Point
-libertiesOfChain color ch (Position n board _ _) = Set.filter ((== Neither) . (board !)) $ surroundingPoints n ch
-
 -- Determine which chains have a point as a liberty
 chainsWithLiberty :: Player -> Point -> Position -> Set Chain
-chainsWithLiberty color pt pos = Set.filter (\ch -> Set.member pt (libertiesOfChain color ch pos)) $ chainsForPlayer color pos
+chainsWithLiberty color pt pos = Set.filter (\ch -> Set.member pt (getLiberties ch)) $ chainsForPlayer color pos
 
 -- Find all the unoccupied points
 allOfColor :: Player -> Position -> Set Point
@@ -131,16 +148,15 @@ scorePosition pos@(Position n board bs ws) = (scoreColor Black, scoreColor White
   where
     allPts = Set.fromList (indices board)
     emptyChains = emptyConnectedRegions [] (allOfColor Neither pos) pos
-    scoreEmptyChains chs color = foldr ((+) . Set.size) 0 matchedChains
+    scoreEmptyChains chs color = foldr ((+) . Set.size) 0 $ filter isInTerritory chs
       where
-        matchedChains = filter isInTerritory chs
         isInTerritory ch = Set.null $ Set.intersection (allOfColor (opponent color) pos) (surroundingPoints n ch)
     scoreColor color = scoreEmptyChains emptyChains color + Set.size (allOfColor color pos)
 
 -- Inner method for score calculation: 
     -- [Chain] is the empty chains so far created 
     -- Set Point is the set of unconsidered empty points
-emptyConnectedRegions :: [Chain] -> Set Point -> Position -> [Chain]
+emptyConnectedRegions :: [Set Point] -> Set Point -> Position -> [Set Point]
 emptyConnectedRegions chs emp pos
     -- If there are no empty points to consider, just return what we have
     | Set.null emp = chs
@@ -150,12 +166,12 @@ emptyConnectedRegions chs emp pos
     expanded = expandEmptyChain (Set.singleton (head (Set.toList emp))) pos
 
 -- Take a chain consisting of empty points and expand it until it has no liberties
-expandEmptyChain :: Chain -> Position -> Chain
+expandEmptyChain :: Set Point -> Position -> Set Point
 expandEmptyChain ch pos
     | Set.null libs = ch
     | otherwise = expandEmptyChain (Set.union ch libs) pos
   where
-    libs = libertiesOfChain Neither ch pos
+    libs = libertiesOnBoard (getBoardSize pos) ch (getBoard pos)
 
 -- Create a nice string representation of the position
 prettyPrintPosition :: Position -> String
