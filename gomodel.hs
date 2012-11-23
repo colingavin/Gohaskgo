@@ -38,7 +38,7 @@ adjacentPointsArrays :: [Array Point (Set Point)]
 adjacentPointsArrays = map adjacentPointsArray [0..]
   where
     adjacentPointsArray n = array ((1, 1), (n, n)) $ [((x, y), adjacentPoints' n x y) | x <- [1..n], y <- [1..n]]
-    adjacentPoints' n x y = Set.fromList $ filter (allowedPoint n) $ [(x, y + 1), (x + 1, y), (x, y - 1), (x - 1, 0)]
+    adjacentPoints' n x y = Set.fromList $ filter (allowedPoint n) $ [(x, y + 1), (x + 1, y), (x, y - 1), (x - 1, y)]
 
 -- Get all the adjacent points of a given point on the specified sized board
 adjacentPoints :: Int -> Point -> Set Point
@@ -165,7 +165,7 @@ prettyPrintPosition (Position n board bs ws) = intercalate "\n" (map stringForRo
     charForPoint x y = case board ! (x, y) of
         Black -> '●'
         White -> '○'
-        Neither -> ' '
+        Neither -> '+'
 
 -- There are two different states that a game can be in, these are represented by different types
 
