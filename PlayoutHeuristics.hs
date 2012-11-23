@@ -37,11 +37,12 @@ type PlayoutHeuristic = Set Point -> IncompleteGame -> (Set Point, Set Point)
 allPlayoutHeuristics :: [PlayoutHeuristic]
 allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic]
 
--- Heuristic to avoid self atari (TODO: This isn't actually correct because it doesn't account for the liberties created by playing)
+-- Heuristic to avoid self atari
 selfAtariHeuristic :: PlayoutHeuristic
-selfAtariHeuristic ps gm = (Set.empty, Set.filter isSelfAtari ps)
+selfAtariHeuristic ps gm = (Set.empty, trace (show (getToPlay gm) ++ ": " ++  (show $ Set.filter isSelfAtari ps)) (Set.filter isSelfAtari ps))
   where
-    isSelfAtari p = not $ Set.null $ Set.filter (\ch -> Set.size (getLiberties ch) == 2) (chainsWithLiberty player p pos)
+    isSelfAtari p = not $ Set.null $ Set.filter (isSelfAtariForChain p) (chainsWithLiberty player p pos)
+    isSelfAtariForChain p ch = Set.size (getLiberties ch) == 2 && not (hasLiberty p pos)
     pos = latestPosition gm
     player = getToPlay gm
 

@@ -127,6 +127,10 @@ positionByClearing color pos@(Position n board bs ws)
     capturedChains = Set.filter (\ch -> Set.null (getLiberties ch)) (chainsForPlayer color pos)
     newBoard = removeChain (joinChains capturedChains) board
 
+-- Determines whether a given position has an empty neighbor
+hasLiberty :: Point -> Player -> Position -> Bool
+hasLiberty p (Position n board _ _) = not $ Set.null $ Set.filter ((== Neither) . (board !)) (adjacentPoints n p)
+
 -- Find all the chains of a specific color
 chainsForPlayer :: Player -> Position -> Set Chain
 chainsForPlayer White = getWhiteChains
