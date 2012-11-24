@@ -127,6 +127,16 @@ positionByClearing color pos@(Position n board bs ws)
     capturedChains = Set.filter (\ch -> Set.null (getLiberties ch)) (chainsForPlayer color pos)
     newBoard = removeChain (joinChains capturedChains) board
 
+-- Construct a position from a board in Array form
+positionFromBoard :: Array Point Player -> Maybe Position
+positionFromBoard board = playThrough (indices board) (emptyPosition $ fst $ snd $ bounds board)
+  where
+    playThrough [] pos = Just pos
+    playThrough (x:xs) pos | (board ! x) == Neither = playThrough xs pos
+    playThrough (x:xs) pos = case positionByPlaying (board ! x) x pos of
+        Left _ -> Nothing
+        Right pos' -> playThrough xs pos'
+
 -- Find all the chains of a specific color
 chainsForPlayer :: Player -> Position -> Set Chain
 chainsForPlayer White = getWhiteChains
