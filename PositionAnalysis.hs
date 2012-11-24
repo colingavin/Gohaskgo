@@ -5,6 +5,7 @@ module PositionAnalysis where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Array
 
 import GoModel
 
@@ -12,3 +13,12 @@ import GoModel
 -- is no such chain.
 capturePoint :: Chain -> Set Point
 capturePoint ch = if (Set.size $ getLiberties ch) == 1 then getLiberties ch else Set.empty
+
+-- Determines whether a given position has an empty neighbor
+hasLibertyOrFriend :: Point -> Player -> Position -> Bool
+hasLibertyOrFriend p color (Position n board _ _) = not $ Set.null $ Set.filter (\neighbor -> (board ! neighbor) `elem` [Neither, color]) (adjacentPoints n p)
+
+isSelfAtari :: Point -> Player -> Position -> Bool
+isSelfAtari p player pos = not $ Set.null $ Set.filter (isSelfAtariForChain p) (chainsWithLiberty player p pos)
+  where
+    isSelfAtariForChain p ch = Set.size (getLiberties ch) == 2 && not (hasLibertyOrFriend p player pos)
