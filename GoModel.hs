@@ -181,7 +181,7 @@ expandEmptyChain ch pos
     | Set.null libs = ch
     | otherwise = expandEmptyChain (Set.union ch libs) pos
   where
-    libs = libertiesOnBoard (getBoardSize pos) ch (getBoard pos)
+    libs = (libertiesOnBoard (getBoardSize pos) ch (getBoard pos)) Set.\\ ch
 
 -- Create a nice string representation of the position
 prettyPrintPosition :: Position -> String
@@ -204,6 +204,9 @@ data IncompleteGame = IncompleteGame {
 
 makeNewGame :: Int -> IncompleteGame
 makeNewGame n = IncompleteGame [emptyPosition n] Black False
+
+makeGameFromPosition :: Position -> Player -> IncompleteGame
+makeGameFromPosition pos toPlay = IncompleteGame [pos] toPlay False
 
 play :: IncompleteGame -> Point -> Either PlayError IncompleteGame
 play (IncompleteGame hist color _) pt = do

@@ -31,6 +31,7 @@ makeRandomMove gm = do
         Nothing -> pass gm
 
 randomPlayout :: AnyGame -> RVar FinishedGame
+--randomPlayout (Left f) | trace (prettyPrintPosition $ latestPosition f) False = undefined
 randomPlayout (Left f) = return f
 randomPlayout (Right gm) = makeRandomMove gm >>= randomPlayout
 
