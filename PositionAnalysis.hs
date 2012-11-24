@@ -22,3 +22,6 @@ isSelfAtari :: Point -> Player -> Position -> Bool
 isSelfAtari p player pos = not $ Set.null $ Set.filter (isSelfAtariForChain p) (chainsWithLiberty player p pos)
   where
     isSelfAtariForChain p ch = Set.size (getLiberties ch) == 2 && not (hasLibertyOrFriend p player pos)
+
+isEye :: Player -> Position -> Point -> Bool
+isEye color (Position n board _ _) p = Set.null $ Set.filter ((/= color) . (board !)) (adjacentPoints n p)

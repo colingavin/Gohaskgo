@@ -40,7 +40,7 @@ type PlayoutHeuristic = Set Point -> IncompleteGame -> (Set Point, Set Point)
 
 -- All the playout heuristics to try in order, may be weighted later
 allPlayoutHeuristics :: [PlayoutHeuristic]
-allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic, escapeHeuristic]
+allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic, escapeHeuristic, eyesHeuristic]
 
 -- Heuristic to avoid self atari
 selfAtariHeuristic :: PlayoutHeuristic
@@ -74,3 +74,9 @@ escapeHeuristic :: PlayoutHeuristic
 escapeHeuristic ps gm = (Set.intersection escapePoints ps, Set.empty)
   where
     escapePoints = flattenSet $ Set.map capturePoint (chainsForPlayer (getToPlay gm) (latestPosition gm))
+
+-- Heuristic to avoid playing in own eyes
+eyesHeuristic :: PlayoutHeuristic
+eyesHeuristic ps gm = (Set.empty, eyes)
+  where
+    eyes = Set.filter (isEye (getToPlay gm) (latestPosition gm)) ps

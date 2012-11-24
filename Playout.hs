@@ -1,10 +1,7 @@
-module Main where
+module Playout where
 
 import Control.Monad
 import Data.Random
-import Data.Random.Source.DevRandom
-import System.Random.MWC (create)
-import System.Random
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace (trace)
@@ -38,11 +35,3 @@ randomPlayout (Right gm) = makeRandomMove gm >>= randomPlayout
 
 randomWinner :: AnyGame -> RVar Player
 randomWinner gm = randomPlayout gm >>= (return . winner)
-
-main = do
-    let emptyGame = Right $ makeNewGame 9
-    let afterRand = randomPlayout emptyGame
-    let randWin = randomWinner emptyGame
-    mwc <- create
-    a <- sampleFrom DevURandom afterRand
-    putStrLn $ prettyPrintPosition $ latestPosition a
