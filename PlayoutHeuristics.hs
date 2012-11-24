@@ -73,6 +73,6 @@ linesHeuristic ps gm = (Set.empty, Set.intersection (badPointsForSize !! boardSi
 
 -- Heuristic to save own chains that are in atari
 escapeHeuristic :: PlayoutHeuristic
-escapeHeuristic ps gm = (trace (show ((getToPlay gm), Set.intersection escapePoints ps)) (Set.intersection escapePoints ps), Set.empty)
+escapeHeuristic ps gm = (Set.intersection escapePoints ps, Set.empty)
   where
     escapePoints = flattenSet $ Set.map capturePoint (chainsForPlayer (getToPlay gm) (latestPosition gm))
