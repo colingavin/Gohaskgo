@@ -23,18 +23,14 @@ makeRandomMoveFrom ps gm = do
         Left _ -> makeRandomMoveFrom (dropIndex ps idx) gm
 
 makeRandomMove :: IncompleteGame -> RVar AnyGame
---makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
+makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
 makeRandomMove gm | getLastWasPass gm && shouldPassToWin gm = return $ pass gm
 makeRandomMove gm | shouldResign gm = return $ Left $ resign gm
 makeRandomMove gm = do
-    goodMove <- makeRandomMoveFrom (Set.toList good) gm
-    fairMove <- makeRandomMoveFrom (Set.toList fair) gm
-    badMove <- makeRandomMoveFrom (Set.toList bad) gm
-    return $ case chooseFirst [goodMove, fairMove, badMove] of
+    plays <- mapM ((flip makeRandomMoveFrom gm) . Set.toList) $ reverse $ classifyMoves (emptyPoints gm) gm
+    return $ case chooseFirst plays of
         Just gm -> gm
         Nothing -> pass gm
-  where
-    (good, fair, bad) = classifyMoves (emptyPoints gm) gm
 
 randomPlayout :: AnyGame -> RVar FinishedGame
 randomPlayout (Left f) = return f

@@ -2,6 +2,10 @@ module PlayoutHeuristics where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.MultiSet (MultiSet)
+import qualified Data.MultiSet as MultiSet
+import GHC.Exts
+
 import Debug.Trace (trace)
 
 import Utils
@@ -10,10 +14,10 @@ import PositionAnalysis
 
 -- Access point to playout heurisitcs
 -- Given a set of open points and a game, groups the moves into good, fair, and bad, to be tried in order
-classifyMoves :: Set Point -> IncompleteGame -> (Set Point, Set Point, Set Point)
-classifyMoves ps gm = (good, ps Set.\\ (Set.union good bad), bad)
+classifyMoves :: Set Point -> IncompleteGame -> [Set Point]
+classifyMoves ps gm = map Set.fromList $ groupWith (\p -> MultiSet.occur p good - MultiSet.occur p bad) $ Set.toList ps
   where
-    (good, bad) = foldr (\(g, b) (cg, cb) -> (Set.union g cg, Set.union b cb) ) (Set.empty, Set.empty) classifications
+    (good, bad) = foldr (\(g, b) (cg, cb) -> (MultiSet.union (MultiSet.fromSet g) cg, MultiSet.union (MultiSet.fromSet b) cb)) (MultiSet.empty, MultiSet.empty) classifications
     classifications = map (\h -> h ps gm) allPlayoutHeuristics
 
 maxPlayoutLength :: [Int]
@@ -36,11 +40,11 @@ type PlayoutHeuristic = Set Point -> IncompleteGame -> (Set Point, Set Point)
 
 -- All the playout heuristics to try in order, may be weighted later
 allPlayoutHeuristics :: [PlayoutHeuristic]
-allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic]
+allPlayoutHeuristics = [selfAtariHeuristic, captureHeuristic, linesHeuristic, escapeHeuristic]
 
 -- Heuristic to avoid self atari
 selfAtariHeuristic :: PlayoutHeuristic
-selfAtariHeuristic ps gm = (Set.empty, trace (show (getToPlay gm) ++ ": " ++  (show $ Set.filter isSelfAtari ps)) (Set.filter isSelfAtari ps))
+selfAtariHeuristic ps gm = (Set.empty, Set.filter isSelfAtari ps)
   where
     isSelfAtari p = not $ Set.null $ Set.filter (isSelfAtariForChain p) (chainsWithLiberty player p pos)
     isSelfAtariForChain p ch = Set.size (getLiberties ch) == 2 && not (hasLiberty p pos)
@@ -66,3 +70,9 @@ linesHeuristic :: PlayoutHeuristic
 linesHeuristic ps gm = (Set.empty, Set.intersection (badPointsForSize !! boardSize) ps)
   where
     boardSize = getSize gm
+
+-- Heuristic to save own chains that are in atari
+escapeHeuristic :: PlayoutHeuristic
+escapeHeuristic ps gm = (trace (show ((getToPlay gm), Set.intersection escapePoints ps)) (Set.intersection escapePoints ps), Set.empty)
+  where
+    escapePoints = flattenSet $ Set.map capturePoint (chainsForPlayer (getToPlay gm) (latestPosition gm))
