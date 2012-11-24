@@ -3,6 +3,7 @@ module Utils where
 import Data.Array
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Tree
 
 -- Tuples
 pair :: a -> b -> (a, b)
@@ -18,6 +19,9 @@ chooseFirst :: [Maybe a] -> Maybe a
 chooseFirst [] = Nothing
 chooseFirst (Nothing:xs) = chooseFirst xs
 chooseFirst ((Just x):xs) = Just x
+
+count :: (a -> Bool) -> [a] -> Int
+count f xs = foldr (\x curr -> if f x then curr + 1 else curr) 0 xs
 
 dimensions :: [[a]] -> Maybe (Int, Int)
 dimensions xss = do
@@ -35,3 +39,14 @@ filterIndices f a = filter (f . (a !)) (indices a)
 -- Sets
 flattenSet :: (Ord a) => Set (Set a) -> Set a
 flattenSet s = Set.foldr Set.union Set.empty s
+
+-- Either
+-- Unsafe function to extract the right value from an either, use when you *know*
+-- it will never be Left
+fromRight :: Either a b -> b
+fromRight (Right r) = r
+fromRight _ = error "Attempt to extract Right value from Left."
+
+-- Tree
+singletonTree :: a -> Tree a
+singletonTree t = return t
