@@ -52,13 +52,14 @@ emptyBoard n = array ((1,1), (n, n)) [((x, y), Neither) | x <- [1..n], y <- [1..
 -- Chains are contigious sets of points
 data Chain = Chain {
     getPoints :: Set Point,
-    getLiberties :: Set Point
+    getLiberties :: Set Point,
+    getNeighbors :: Set Point
 } deriving (Show, Eq, Ord)
 
 joinChains :: Set Chain -> Chain
-joinChains = Set.foldr joinPair (Chain Set.empty Set.empty)
+joinChains = Set.foldr joinPair (Chain Set.empty Set.empty Set.empty)
   where
-    joinPair (Chain ps ls) (Chain ps' ls') = Chain (Set.union ps ps') (Set.union ls ls')
+    joinPair (Chain ps ls ns) (Chain ps' ls' ns') = Chain (Set.union ps ps') (Set.union ls ls') (Set.union ns ns')
 
 surroundingPoints :: Int -> Set Point -> Set Point
 surroundingPoints n ps = (Set.unions $ map (adjacentPoints n) (Set.toList ps)) Set.\\ ps
@@ -67,7 +68,7 @@ libertiesOnBoard :: Int -> Set Point -> Array Point Player -> Set Point
 libertiesOnBoard n ps board = Set.foldr Set.union Set.empty $ Set.map (\p -> Set.filter ((== Neither) . (board !)) (adjacentPoints n p)) ps
 
 removeChain :: Chain -> Array Point Player -> Array Point Player
-removeChain (Chain ps _) board = board // map (flip pair Neither) (Set.toList ps)
+removeChain (Chain ps _ _) board = board // map (flip pair Neither) (Set.toList ps)
 
 
 -- PlayErrors happen when a point cannot be played at
@@ -107,7 +108,7 @@ positionByPlaying color pt pos@(Position n board bs ws)
 
 -- Insert a point into a chain and update its liberties
 insertPoint :: Point -> Player -> Array Point Player -> Int -> Chain -> Chain
-insertPoint p color board n (Chain ps _) = Chain newPoints (libertiesOnBoard n newPoints board)
+insertPoint p color board n (Chain ps _ _) = Chain newPoints (libertiesOnBoard n newPoints board) (surroundingPoints n newPoints)
   where
     newPoints = Set.insert p ps
 
@@ -115,7 +116,7 @@ insertPoint p color board n (Chain ps _) = Chain newPoints (libertiesOnBoard n n
 updateLiberties :: Player -> Array Point Player -> Int -> Set Chain -> Set Chain
 updateLiberties color board n chs = Set.map updateOne chs
   where
-    updateOne (Chain ps _) = Chain ps (libertiesOnBoard n ps board)
+    updateOne (Chain ps _ ns) = Chain ps (Set.filter ((== Neither) . (board !)) ns) ns
 
 -- Create a new position by clearing all captured chains of a given color
 positionByClearing :: Player -> Position -> Position
