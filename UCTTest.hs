@@ -1,5 +1,6 @@
 module Main where
 
+import System.Environment
 import Data.Random
 import Data.Maybe
 import System.Random.MWC (create)
@@ -11,17 +12,14 @@ import UCT
 
 main = do
     putStrLn "Enter a problem:"
-    filename <- getLine
-    problemText <- readFile filename
+    args <- getArgs
+    problemText <- readFile $ args !! 0
     case parseToPosition problemText of
-        Nothing -> putStrLn "Invalid"
+        Nothing -> putStrLn "Invalid problem file."
         Just pos -> do
+            putStrLn "Evaluating:"
             putStrLn $ prettyPrintPosition pos
-            putStrLn "How many iterations?"
-            iters <- getLine
-            putStrLn "How many playouts per iteration?"
-            playouts <- getLine
             mwc <- create
             let gm = makeGameFromPosition pos Black
-            response <- sampleFrom mwc $ uctRespond gm (read iters) (read playouts)
-            putStrLn (show response)
+            response <- sampleFrom mwc $ uctRespond gm 1000 1
+            putStrLn $ "Will respond by playing at: " ++ (show response)
