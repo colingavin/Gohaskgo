@@ -38,7 +38,7 @@ uctRespond gm iters playouts = uctSearch (return rootNode) gm iters playouts
     rootNode = SearchNode (opponent $ getToPlay gm) (0,0) 0 0 (emptyPoints gm)
 
 uctSearch :: UCT -> IncompleteGame -> Int -> Int -> RVar Point
-uctSearch tree gm iters playouts | trace (drawTree (fmap show tree)) False = undefined
+-- uctSearch tree gm iters playouts | trace (drawTree (fmap show tree)) False = undefined
 -- With no iterations left, return the most visited top level move
 uctSearch tree _ 0 _ = return $ getMove $ last $ sortWith getVisits $ head $ tail $ levels tree
 -- Perform a recursive Monte Carlo search for a given number of iterations
@@ -46,7 +46,7 @@ uctSearch tree gm iters playouts = do
     -- Find the node at the bottom of the tree to expand
     let (toExpand, gameAtBottom) = searchDown tree gm
     -- Randomly expand it using heuristics
-    (newNode, expandedGame) <- expandNode toExpand gameAtBottom
+    let (newNode, expandedGame) = expandNode toExpand gameAtBottom
     -- Preform the specified number of playouts on the new node
     wins <- playoutNode newNode expandedGame playouts
     -- Propogate the results back up the tree and repeat
@@ -83,30 +83,31 @@ uctScore node parentVisits = wins / visits + sqrt(2 * log(fromIntegral parentVis
     visits = fromIntegral $ getVisits node
 
 -- Add a node at the bottom of the tree by playing a random move, directed by playout heuristics
-expandNode :: UCTZipper -> IncompleteGame -> RVar (UCTZipper, IncompleteGame)
-expandNode zipper gm = do
-    let node = label zipper
-    -- Get the (new game, move) from the heuristics
-    move <- makeRandomMoveFrom (Set.toList $ getAvailableMoves node) gm
-    case move of
-        -- If there was no move to make, set avaliable moves to {}
-        Nothing -> do
-            let node' = setAvaliableMoves Set.empty node
-            let zipper' = setLabel node' zipper
-            return (zipper', gm)
-        -- Otherwise, create the new search node with that move and append it to the bottom of the tree
-        Just (ng, pt) -> do
-            let newChild = SearchNode (opponent $ getPlayer node) pt 0 0 (emptyPoints ng)
-            let node' = setAvaliableMoves (Set.delete pt $ getAvailableMoves node) node
-            let zipper' = setLabel node' zipper
-            let zipper'' = insert (return newChild) $ children zipper'
-            return (zipper'', ng)
+expandNode :: UCTZipper -> IncompleteGame -> (UCTZipper, IncompleteGame)
+expandNode zipper gm = case firstAvaliableMove (Set.toList $ getAvailableMoves node) of
+    -- If there was no move to make, set avaliable moves to {}
+    Nothing ->
+        let node' = setAvaliableMoves Set.empty node
+            zipper' = setLabel node' zipper
+        in (zipper', gm)
+    -- Otherwise, create the new search node with that move and append it to the bottom of the tree
+    Just (ng, pt) ->
+        let newChild = SearchNode (opponent $ getPlayer node) pt 0 0 (emptyPoints ng)
+            node' = setAvaliableMoves (Set.delete pt $ getAvailableMoves node) node
+            zipper' = setLabel node' zipper
+            zipper'' = insert (return newChild) $ children zipper'
+        in (zipper'', ng)
+  where
+    node = label zipper
+    firstAvaliableMove [] = Nothing
+    firstAvaliableMove (x:xs) = case play gm x of
+        Right ng -> Just (ng, x)
+        Left _ -> firstAvaliableMove xs
 
 -- Playout a given node some number of times, returning the number of wins
 playoutNode :: UCTZipper -> IncompleteGame -> Int -> RVar Int
 playoutNode zipper gm playouts = do
     let node = label zipper
-    let moves = Set.toList $ getAvailableMoves node
     winners <- sequence $ replicate playouts $ randomWinner (Right gm)
     return $ count (== (getPlayer node)) winners
 
