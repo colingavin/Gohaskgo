@@ -108,8 +108,12 @@ positionByPlaying color pt pos@(Position n board bs ws)
 
 -- Insert a point into a chain and update its liberties
 insertPoint :: Point -> Player -> Array Point Player -> Int -> Chain -> Chain
-insertPoint p color board n (Chain ps _ _) = Chain newPoints (libertiesOnBoard n newPoints board) (surroundingPoints n newPoints)
+insertPoint p color board n (Chain ps _ ns)
+    | Set.null ps = Chain newPoints newLiberties newNeighbors
+    | otherwise = Chain newPoints newLiberties ((Set.union newNeighbors (Set.delete p ns)) Set.\\ ps)
   where
+    newNeighbors = adjacentPoints n p
+    newLiberties = (libertiesOnBoard n newPoints board)
     newPoints = Set.insert p ps
 
 -- Update the liberties of the chains of a given color
