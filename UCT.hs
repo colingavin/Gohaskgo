@@ -1,5 +1,6 @@
 module UCT where
 
+import Data.List hiding (insert)
 import Data.Tree
 import Data.Tree.Zipper hiding (last)
 import Data.Random
@@ -21,6 +22,9 @@ data SearchNode = SearchNode {
     getAvailableMoves :: Set Point
 } deriving Show
 
+prettyShowNode :: SearchNode -> String
+prettyShowNode (SearchNode _ m w v _) = "Move: " ++ (show m) ++ ". W/V: " ++ (show w) ++ "/" ++ (show v)
+
 setAvaliableMoves :: Set Point -> SearchNode -> SearchNode
 setAvaliableMoves as (SearchNode p m w v _) = (SearchNode p m w v as)
 
@@ -38,7 +42,8 @@ uctRespond gm iters playouts = uctSearch (return rootNode) gm iters playouts
     rootNode = SearchNode (opponent $ getToPlay gm) (0,0) 0 0 (emptyPoints gm)
 
 uctSearch :: UCT -> IncompleteGame -> Int -> Int -> RVar Point
--- uctSearch tree gm iters playouts | trace (drawTree (fmap show tree)) False = undefined
+--uctSearch tree _ 0 _ | trace (drawTree (fmap show tree)) False = undefined
+uctSearch tree _ 0 _ | trace (intercalate "\n" $ map prettyShowNode $ sortWith getVisits $ head $ tail $ levels tree) False = undefined
 -- With no iterations left, return the most visited top level move
 uctSearch tree _ 0 _ = return $ getMove $ last $ sortWith getVisits $ head $ tail $ levels tree
 -- Perform a recursive Monte Carlo search for a given number of iterations
