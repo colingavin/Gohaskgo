@@ -101,10 +101,8 @@ positionByPlaying color pt pos@(Position n board bs ws)
         newBoard = board // [(pt, color)]
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
         merged = Set.insert (insertPoint pt color board n (joinChains withLiberty)) withoutLiberty
-        -- Find the chains that don't have pt as a liberty
-        withoutLiberty = (chainsForPlayer color pos) Set.\\ withLiberty
-        -- Find the chains that have pt as a liberty
-        withLiberty = chainsWithLiberty color pt pos
+        -- Find the chains that do and don't have pt as a liberty
+        (withLiberty, withoutLiberty) = Set.partition (\(Chain _ ls _) -> Set.member pt ls) (chainsForPlayer color pos)
 
 -- Insert a point into a chain and update its liberties
 insertPoint :: Point -> Player -> Array Point Player -> Int -> Chain -> Chain
