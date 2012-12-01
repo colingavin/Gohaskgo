@@ -15,11 +15,6 @@ dropIndex xs n = beginning ++ (tail end)
   where
     (beginning, end) = splitAt n xs
 
-chooseFirst :: [Maybe a] -> Maybe a
-chooseFirst [] = Nothing
-chooseFirst (Nothing:xs) = chooseFirst xs
-chooseFirst ((Just x):xs) = Just x
-
 count :: (a -> Bool) -> [a] -> Int
 count f xs = foldr (\x curr -> if f x then curr + 1 else curr) 0 xs
 
@@ -42,7 +37,7 @@ flattenSet s = Set.foldr Set.union Set.empty s
 
 -- Either
 -- Unsafe function to extract the right value from an either, use when you *know*
--- it will never be Left
+-- it will never be Left (this is like fromJust in Data.Maybe)
 fromRight :: Either a b -> b
 fromRight (Right r) = r
 fromRight _ = error "Attempt to extract Right value from Left."

@@ -11,7 +11,6 @@ import AsciiBoardParser
 import UCT
 
 main = do
-    putStrLn "Enter a problem:"
     args <- getArgs
     problemText <- readFile $ args !! 0
     case parseToPosition problemText of
