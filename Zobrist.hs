@@ -8,7 +8,7 @@ import Control.Monad
 
 import Data.Random.Source.DevRandom
 
-import GoModel
+import GoTypes
 
 
 -- A record containing the Zobrist hash elements
