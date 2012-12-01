@@ -95,8 +95,8 @@ positionByPlaying :: Player -> Point -> Position -> Either PlayError Position
 positionByPlaying color pt pos@(Position n board bs ws)
     | not $ allowedPoint n pt = Left Other
     | board ! pt /= Neither = Left OccupiedPoint
-    | color == White = Right $ Position n newBoard (updateLiberties Black newBoard n bs) merged
-    | color == Black = Right $ Position n newBoard merged (updateLiberties White newBoard n ws)
+    | color == White = Right $ Position n newBoard (updateLiberties Black newBoard bs) merged
+    | color == Black = Right $ Position n newBoard merged (updateLiberties White newBoard ws)
     where
         newBoard = board // [(pt, color)]
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
@@ -115,16 +115,16 @@ insertPoint p color board n (Chain ps _ ns)
     newPoints = Set.insert p ps
 
 -- Update the liberties of the chains of a given color
-updateLiberties :: Player -> Array Point Player -> Int -> Set Chain -> Set Chain
-updateLiberties color board n chs = Set.map updateOne chs
+updateLiberties :: Player -> Array Point Player -> Set Chain -> Set Chain
+updateLiberties color board chs = Set.map updateOne chs
   where
     updateOne (Chain ps _ ns) = Chain ps (Set.filter ((== Neither) . (board !)) ns) ns
 
 -- Create a new position by clearing all captured chains of a given color
 positionByClearing :: Player -> Position -> Position
 positionByClearing color pos@(Position n board bs ws)
-    | color == White = Position n newBoard (updateLiberties Black newBoard n bs) (ws Set.\\ capturedChains)
-    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newBoard n ws)
+    | color == White = Position n newBoard (updateLiberties Black newBoard bs) (ws Set.\\ capturedChains)
+    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newBoard ws)
     | color == Neither = error "Can't clear empty."
   where
     capturedChains = Set.filter (\ch -> Set.null (getLiberties ch)) (chainsForPlayer color pos)
