@@ -17,7 +17,10 @@ capturePoint ch = if (Set.size $ getLiberties ch) == 1 then getLiberties ch else
 
 -- Determines whether a given position has an empty neighbor
 hasLibertyOrFriend :: Point -> Player -> Position -> Bool
-hasLibertyOrFriend p color (Position n board _ _ _ _) = not $ Set.null $ Set.filter (\neighbor -> (board ! neighbor) `elem` [Neither, color]) (adjacentPoints n p)
+hasLibertyOrFriend p color pos = not $ Set.null $ Set.filter (\neighbor -> (board ! neighbor) `elem` [Neither, color]) (adjacentPoints n p)
+  where
+    board = getBoard pos
+    n = getBoardSize pos
 
 isSelfAtari :: Point -> Player -> Position -> Bool
 isSelfAtari p player pos = not $ Set.null $ Set.filter (isSelfAtariForChain p) (chainsWithLiberty player p pos)
@@ -25,4 +28,8 @@ isSelfAtari p player pos = not $ Set.null $ Set.filter (isSelfAtariForChain p) (
     isSelfAtariForChain p ch = Set.size (getLiberties ch) == 2 && not (hasLibertyOrFriend p player pos)
 
 isEye :: Player -> Position -> Point -> Bool
-isEye color (Position n board _ _ _ _) p = Set.null $ Set.filter ((/= color) . (board !)) (adjacentPoints n p)
+isEye color pos p = Set.null $ Set.filter ((/= color) . (board !)) (adjacentPoints n p)
+  where
+    board = getBoard pos
+    n = getBoardSize pos
+
