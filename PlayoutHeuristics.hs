@@ -73,15 +73,10 @@ captureHeuristic ps gm = adjustScores 1 $ Set.intersection capturePoints ps
     opp = opponent $ getToPlay gm
 
 -- Heuristic to avoid playing on lines 1 and 2
-badPointsForSize :: [Set Point]
-badPointsForSize = map badPoints [0..]
-  where
-    badPoints n = Set.filter (isOnBadLine n) $ Set.fromList [(x, y) | x <- [1..n], y <- [1..n]]
-    isOnBadLine n (x, y) = x == 1 || y == 1 || x == 2 || y == 2 || x == n || y == n || x == n - 1 || y == n - 1
-
 linesHeuristic :: PlayoutHeuristic
-linesHeuristic ps gm = adjustScores (-1) $ Set.intersection (badPointsForSize !! boardSize) ps
+linesHeuristic ps gm = adjustScores (-1) $ Set.filter (isOnBadLine boardSize) ps
   where
+    isOnBadLine n (x, y) = x == 1 || y == 1 || x == 2 || y == 2 || x == n || y == n || x == n - 1 || y == n - 1
     boardSize = getSize gm
 
 -- Heuristic to save own chains that are in atari
