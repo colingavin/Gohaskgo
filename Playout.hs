@@ -9,6 +9,7 @@ import Debug.Trace (trace)
 import GoModel
 import PlayoutHeuristics
 import Utils
+import GoTypes
 
 
 makeRandomMoveFrom :: [Point] -> IncompleteGame -> RVar (Maybe (IncompleteGame, Point))

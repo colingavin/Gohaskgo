@@ -49,22 +49,25 @@ data Position = Position {
     getBoardSize :: Int,
     getBoard :: Array Point Player,
     getBlackChains :: Set Chain,
-    getWhiteChains :: Set Chain
+    getWhiteChains :: Set Chain,
+    getZobristData :: ZobristData,
+    getHash :: ZobristHash
 } deriving (Eq, Show)
 
 -- Create a new, empty position
-emptyPosition :: Int -> Position
-emptyPosition n = Position n (emptyBoard n) Set.empty Set.empty
+emptyPosition :: Int -> ZobristData -> Position
+emptyPosition n zob = Position n (emptyBoard n) Set.empty Set.empty zob (emptyBoardHash zob)
 
 -- Play at a point with a color (note, no pattern for Neither, this should be a crash)
 positionByPlaying :: Player -> Point -> Position -> Either PlayError Position
-positionByPlaying color pt pos@(Position n board bs ws)
+positionByPlaying color pt pos@(Position n board bs ws zob hash)
     | not $ allowedPoint n pt = Left Other
     | board ! pt /= Neither = Left OccupiedPoint
-    | color == White = Right $ Position n newBoard (updateLiberties Black newBoard bs) merged
-    | color == Black = Right $ Position n newBoard merged (updateLiberties White newBoard ws)
+    | color == White = Right $ Position n newBoard (updateLiberties Black newBoard bs) merged zob newHash
+    | color == Black = Right $ Position n newBoard merged (updateLiberties White newBoard ws) zob newHash
     where
         newBoard = board // [(pt, color)]
+        newHash = changePoint pt Neither color zob hash
         -- Merge the chains that have pt as a liberty with pt and add them to the rest
         merged = Set.insert (insertPoint pt color board n (joinChains withLiberty)) withoutLiberty
         -- Find the chains that do and don't have pt as a liberty
@@ -88,17 +91,20 @@ updateLiberties color board chs = Set.map updateOne chs
 
 -- Create a new position by clearing all captured chains of a given color
 positionByClearing :: Player -> Position -> Position
-positionByClearing color pos@(Position n board bs ws)
-    | color == White = Position n newBoard (updateLiberties Black newBoard bs) (ws Set.\\ capturedChains)
-    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newBoard ws)
+positionByClearing color pos@(Position n board bs ws zob hash)
+    | color == White = Position n newBoard (updateLiberties Black newBoard bs) (ws Set.\\ capturedChains) zob newHash
+    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newBoard ws) zob newHash
     | color == Neither = error "Can't clear empty."
   where
     capturedChains = Set.filter (\ch -> Set.null (getLiberties ch)) (chainsForPlayer color pos)
-    newBoard = removeChain (joinChains capturedChains) board
+    joined = joinChains capturedChains
+    capturedPoints = getPoints joined
+    newHash = Set.foldr (\pt accum -> changePoint pt color Neither zob hash) hash capturedPoints
+    newBoard = removeChain joined board
 
 -- Construct a position from a board in Array form
-positionFromBoard :: Array Point Player -> Maybe Position
-positionFromBoard board = playThrough (indices board) (emptyPosition $ fst $ snd $ bounds board)
+positionFromBoard :: Array Point Player -> ZobristData -> Maybe Position
+positionFromBoard board zob = playThrough (indices board) (emptyPosition (fst $ snd $ bounds board) zob)
   where
     playThrough [] pos = Just pos
     playThrough (x:xs) pos | (board ! x) == Neither = playThrough xs pos
@@ -119,11 +125,11 @@ chainsWithLiberty color pt pos = Set.filter (\ch -> Set.member pt (getLiberties 
 
 -- Find all the unoccupied points
 allOfColor :: Player -> Position -> Set Point
-allOfColor color (Position _ board _ _) = Set.fromList $ filterIndices (== color) board
+allOfColor color (Position _ board _ _ _ _) = Set.fromList $ filterIndices (== color) board
 
 -- Calculates the chinese score of the position for (Black, White)
 scorePosition :: Position -> (Int, Int)
-scorePosition pos@(Position n board bs ws) = (scoreColor Black, scoreColor White)
+scorePosition pos@(Position n board bs ws _ _) = (scoreColor Black, scoreColor White)
   where
     allPts = Set.fromList (indices board)
     emptyChains = emptyConnectedRegions [] (allOfColor Neither pos) pos
@@ -154,7 +160,7 @@ expandEmptyChain ch pos
 
 -- Create a nice string representation of the position
 prettyPrintPosition :: Position -> String
-prettyPrintPosition (Position n board bs ws) = intercalate "\n" (map stringForRow [1 .. n])
+prettyPrintPosition (Position n board bs ws _ _) = intercalate "\n" (map stringForRow [1 .. n])
   where
     stringForRow x = intersperse ' ' $ map (charForPoint x) [1 .. n]
     charForPoint x y = case board ! (x, y) of
@@ -166,35 +172,37 @@ prettyPrintPosition (Position n board bs ws) = intercalate "\n" (map stringForRo
 
 -- IncompleteGames retain their history and other information, they also can be played
 data IncompleteGame = IncompleteGame {
-    getHistory :: [Position],
+    getLatestPosition :: Position,
+    getHistory :: Set ZobristHash,
     getToPlay :: Player,
     getLastWasPass :: Bool
 } deriving (Show)
 
-makeNewGame :: Int -> IncompleteGame
-makeNewGame n = IncompleteGame [emptyPosition n] Black False
+makeNewGame :: Int -> ZobristData -> IncompleteGame
+makeNewGame n zob = IncompleteGame (emptyPosition n zob) Set.empty Black False
 
 makeGameFromPosition :: Position -> Player -> IncompleteGame
-makeGameFromPosition pos toPlay = IncompleteGame [pos] toPlay False
+makeGameFromPosition pos toPlay = IncompleteGame pos Set.empty toPlay False
 
 play :: IncompleteGame -> Point -> Either PlayError IncompleteGame
-play (IncompleteGame hist color _) pt = do
-    newPos <- positionByPlaying color pt (head hist)
+play (IncompleteGame pos hist color _) pt = do
+    newPos <- positionByPlaying color pt pos
     let cleared = positionByClearing (opponent color) newPos
     let selfCapture = any (Set.null . getLiberties) $ Set.toList (chainsForPlayer color cleared)
     if selfCapture
         then throwError Suicide
-        else if (cleared `elem` hist) then throwError KoViolation
-        else return $ IncompleteGame (cleared:hist) (opponent color) False
+    else if Set.member (getHash cleared) hist
+        then throwError KoViolation
+    else return $ IncompleteGame cleared (Set.insert (getHash cleared) hist) (opponent color) False
 
 pass :: IncompleteGame -> AnyGame
-pass (IncompleteGame (h:hs) color p) = do
+pass (IncompleteGame pos hist color p) = do
     if p
-        then Left $ FinishedGame h
-        else return $ IncompleteGame (h:h:hs) (opponent color) True
+        then Left $ FinishedGame pos
+        else return $ IncompleteGame pos hist (opponent color) True
 
 resign :: IncompleteGame -> FinishedGame
-resign (IncompleteGame (h:hs) _ _) = FinishedGame h
+resign (IncompleteGame pos _ _ _) = FinishedGame pos
 
 emptyPoints :: IncompleteGame -> Set Point
 emptyPoints = (allOfColor Neither) . latestPosition
@@ -223,7 +231,7 @@ class Show a => Game a where
     getSize = getBoardSize . latestPosition
 
 instance Game IncompleteGame where
-    latestPosition = head . getHistory
+    latestPosition = getLatestPosition
 
 instance Game FinishedGame where
     latestPosition = getLastPosition

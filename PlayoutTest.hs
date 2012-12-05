@@ -6,12 +6,15 @@ import Data.Random.Source.DevRandom
 
 import Playout
 import GoModel
+import GoTypes
 import AsciiBoardParser
+import Zobrist
 
 readProblem :: String -> IO (Maybe IncompleteGame)
 readProblem filename = do
     problemText <- readFile filename
-    case parseToPosition problemText of
+    mPos <- parseToPosition problemText
+    case mPos of
         Nothing -> return $ Nothing
         Just pos -> do
             return $ Just $ makeGameFromPosition pos White
@@ -24,7 +27,9 @@ main = do
             return $ case problem of
                 Nothing -> error "Invalid filename."
                 Just gm -> Right gm
-        else return $ Right $ makeNewGame 9
+        else do
+            zob <- sampleFrom DevURandom (newZobristData 9)
+            return $ Right $ makeNewGame 9 zob
     let afterRand = randomPlayout game
     a <- sampleFrom DevURandom afterRand
     putStrLn $ prettyPrintPosition $ latestPosition a

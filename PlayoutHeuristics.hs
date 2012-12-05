@@ -12,6 +12,7 @@ import Debug.Trace (trace)
 
 import Utils
 import GoModel
+import GoTypes
 import PositionAnalysis
 
 -- Access point to playout heurisitcs
@@ -32,7 +33,7 @@ shouldPassToWin gm = (winner $ resign gm) == getToPlay gm
 
 -- Tests a game to determine if the opponent has all-but-won
 shouldResign :: IncompleteGame -> Bool
-shouldResign gm = opponentsCount - playersCount > (getSize gm)^2 `div` 2 || (length $ (getHistory gm)) > maxPlayoutLength !! (getSize gm)
+shouldResign gm = opponentsCount - playersCount > (getSize gm)^2 `div` 2 || (Set.size $ getHistory gm) > maxPlayoutLength !! (getSize gm)
   where
     playersCount = Set.size $ allOfColor (getToPlay gm) pos
     opponentsCount = Set.size $ allOfColor (opponent $ getToPlay gm) pos

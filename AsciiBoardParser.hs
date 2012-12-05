@@ -4,8 +4,13 @@ module AsciiBoardParser where
 
 import Text.ParserCombinators.Parsec
 import Data.Array
+import Data.Random
+import System.Random.MWC (create)
+import Debug.Trace (trace)
 
 import GoModel
+import GoTypes
+import Zobrist
 import Utils
 
 boardP :: Parser [[Player]]
@@ -33,5 +38,11 @@ convertToBoard pss = do
 parseToBoard :: String -> Maybe (Array Point Player)
 parseToBoard str = parseToNestedList str >>= convertToBoard
 
-parseToPosition :: String -> Maybe Position
-parseToPosition str = parseToBoard str >>= positionFromBoard
+parseToPosition :: String -> IO (Maybe Position)
+parseToPosition str = case parseToBoard str of
+    Just board -> do
+        mwc <- create
+        let size = fst $ snd $ bounds board
+        zob <- sampleFrom mwc (newZobristData size)
+        return $ positionFromBoard board zob
+    Nothing -> return Nothing

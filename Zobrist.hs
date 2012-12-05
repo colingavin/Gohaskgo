@@ -15,7 +15,7 @@ import GoTypes
 data ZobristData = ZobristData {
     getPositionElements :: Array (Int, Int, Player) Int64, -- Elements refering to specific positions on the board
     getPlayFlag :: Int64 -- An element representing black-to-play
-} deriving (Show)
+} deriving (Show, Eq)
 
 type ZobristHash = Int64
 

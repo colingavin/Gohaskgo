@@ -8,7 +8,9 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import GoModel
+import GoTypes
 import UCT
+import Zobrist
 
 
 -- User input parsing (using Parsec)
@@ -80,4 +82,6 @@ interactGame (Right gm) players = do
 
 players = cycle [getPoint, getUCTMove]
 
-main = interactGame (Right $ makeNewGame 9) players
+main = do
+    zob <- sampleFrom DevURandom (newZobristData 9)
+    interactGame (Right $ makeNewGame 9 zob) players

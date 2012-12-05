@@ -11,6 +11,7 @@ import Data.Maybe
 import Debug.Trace (trace)
 
 import GoModel
+import GoTypes
 import Utils
 import Playout
 
