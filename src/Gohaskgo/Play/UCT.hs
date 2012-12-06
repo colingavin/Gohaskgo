@@ -1,4 +1,4 @@
-module UCT where
+module Gohaskgo.Play.UCT where
 
 import Data.List hiding (insert)
 import Data.Tree
@@ -10,10 +10,12 @@ import qualified Data.Set as Set
 import Data.Maybe
 import Debug.Trace (trace)
 
-import GoModel
-import GoTypes
-import Utils
-import Playout
+import Gohaskgo.Utilities.General
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
+import Gohaskgo.Model.Gameplay
+import Gohaskgo.Playout.Base
+
 
 data SearchNode = SearchNode {
     getPlayer :: Player,

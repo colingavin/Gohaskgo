@@ -1,4 +1,4 @@
-module AsciiBoardParser where
+module Gohaskgo.Utilities.AsciiBoardParser where
 
 -- This module parses boards in the standard ASCII format into positions
 
@@ -8,10 +8,12 @@ import Data.Random
 import System.Random.MWC (create)
 import Debug.Trace (trace)
 
-import GoModel
-import GoTypes
-import Zobrist
-import Utils
+import Gohaskgo.Utilities.General
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
+import Gohaskgo.Model.Zobrist
+import Gohaskgo.Model.Position
+
 
 boardP :: Parser [[Player]]
 boardP = sepEndBy

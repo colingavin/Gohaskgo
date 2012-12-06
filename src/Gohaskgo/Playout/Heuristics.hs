@@ -1,4 +1,4 @@
-module PlayoutHeuristics where
+module Gohaskgo.Playout.Heuristics where
 
 import Control.Monad.State
 import Data.Array
@@ -10,10 +10,14 @@ import GHC.Exts
 
 import Debug.Trace (trace)
 
-import Utils
-import GoModel
-import GoTypes
-import PositionAnalysis
+import Gohaskgo.Playout.PositionAnalysis
+import Gohaskgo.Utilities.General
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
+import Gohaskgo.Model.Chain
+import Gohaskgo.Model.Gameplay
+import Gohaskgo.Model.Position
+
 
 -- Access point to playout heurisitcs
 -- Given a set of open points and a game, groups the moves into good, fair, and bad, to be tried in order

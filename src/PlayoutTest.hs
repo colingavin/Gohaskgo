@@ -4,11 +4,13 @@ import System.Environment
 import Data.Random
 import Data.Random.Source.DevRandom
 
-import Playout
-import GoModel
-import GoTypes
-import AsciiBoardParser
-import Zobrist
+
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Position
+import Gohaskgo.Model.Gameplay
+import Gohaskgo.Model.Zobrist
+import Gohaskgo.Utilities.AsciiBoardParser
+import Gohaskgo.Playout.Base
 
 readProblem :: String -> IO (Maybe IncompleteGame)
 readProblem filename = do

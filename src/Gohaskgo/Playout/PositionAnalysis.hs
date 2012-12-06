@@ -1,4 +1,4 @@
-module PositionAnalysis where
+module Gohaskgo.Playout.PositionAnalysis where
 
 -- This package contains code that is not part of the model itself,
 -- but is used to extract information about game positions.
@@ -7,8 +7,11 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Array
 
-import GoModel
-import GoTypes
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
+import Gohaskgo.Model.Chain
+import Gohaskgo.Model.Position
+
 
 -- Finds a point that will capture the given chain, returns an empty set if there
 -- is no such chain.

@@ -7,10 +7,12 @@ import Text.ParserCombinators.Parsec
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import GoModel
-import GoTypes
-import UCT
-import Zobrist
+import Gohaskgo.Play.UCT
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
+import Gohaskgo.Model.Zobrist
+import Gohaskgo.Model.Position
+import Gohaskgo.Model.Gameplay
 
 
 -- User input parsing (using Parsec)

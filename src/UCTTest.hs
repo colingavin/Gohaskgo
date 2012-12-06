@@ -6,11 +6,12 @@ import Data.Maybe
 import System.Random.MWC (create)
 import Data.Random.Source.DevRandom
 
-import GoModel
-import GoTypes
-import AsciiBoardParser
-import UCT
-import Zobrist
+import Gohaskgo.Utilities.AsciiBoardParser
+import Gohaskgo.Play.UCT
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Zobrist
+import Gohaskgo.Model.Position
+import Gohaskgo.Model.Gameplay
 
 main = do
     mwc <- create

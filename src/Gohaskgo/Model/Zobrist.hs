@@ -1,4 +1,4 @@
-module Zobrist where
+module Gohaskgo.Model.Zobrist where
 
 import Data.Random
 import Data.Int
@@ -6,9 +6,8 @@ import Data.Array
 import Data.Bits
 import Control.Monad
 
-import Data.Random.Source.DevRandom
-
-import GoTypes
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
 
 
 -- A record containing the Zobrist hash elements

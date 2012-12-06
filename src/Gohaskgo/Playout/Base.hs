@@ -1,4 +1,4 @@
-module Playout where
+module Gohaskgo.Playout.Base where
 
 import Control.Monad
 import Data.Random
@@ -6,10 +6,11 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace (trace)
 
-import GoModel
-import PlayoutHeuristics
-import Utils
-import GoTypes
+import Gohaskgo.Playout.Heuristics
+import Gohaskgo.Utilities.General
+import Gohaskgo.Model.Base
+import Gohaskgo.Model.Point
+import Gohaskgo.Model.Gameplay
 
 
 makeRandomMoveFrom :: [Point] -> IncompleteGame -> RVar (Maybe (IncompleteGame, Point))

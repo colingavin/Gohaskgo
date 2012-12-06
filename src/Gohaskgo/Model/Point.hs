@@ -1,17 +1,10 @@
-module GoTypes where
+module Gohaskgo.Model.Point where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Array
 
--- Go is played by two players, Black and White, some intersections on the board may be Neither
-data Player = Black | White | Neither deriving (Eq, Show, Ord, Enum, Ix)
-
--- Get the opposing Player
-opponent :: Player -> Player
-opponent White = Black
-opponent Black = White
-opponent Neither = Neither
+import Gohaskgo.Model.Base
 
 
 -- Points represent intersections on the board

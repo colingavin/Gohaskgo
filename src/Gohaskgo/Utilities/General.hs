@@ -1,4 +1,4 @@
-module Utils where
+module Gohaskgo.Utilities.General where
 
 import Data.Array
 import Data.Set (Set)
