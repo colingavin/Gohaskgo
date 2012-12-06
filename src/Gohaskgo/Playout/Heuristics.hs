@@ -4,8 +4,6 @@ import Control.Monad.State
 import Data.Array
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.MultiSet (MultiSet)
-import qualified Data.MultiSet as MultiSet
 import GHC.Exts
 
 import Debug.Trace (trace)

@@ -40,9 +40,9 @@ play (IncompleteGame pos hist color _) pt = do
     let selfCapture = any (Set.null . getLiberties) $ Set.toList (chainsForPlayer color cleared)
     if selfCapture
         then throwError Suicide
-    else if Set.member (getHash cleared) hist
-        then throwError KoViolation
-    else return $ IncompleteGame cleared (Set.insert (getHash cleared) hist) (opponent color) False
+        else if Set.member (getHash cleared) hist
+            then throwError KoViolation
+            else return $ IncompleteGame cleared (Set.insert (getHash cleared) hist) (opponent color) False
 
 pass :: IncompleteGame -> AnyGame
 pass (IncompleteGame pos hist color p) = do
