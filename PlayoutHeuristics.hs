@@ -89,4 +89,7 @@ escapeHeuristic ps gm = adjustScores 1 $ Set.intersection escapePoints ps
 eyesHeuristic :: PlayoutHeuristic
 eyesHeuristic ps gm = adjustScores (-1) eyes
   where
-    eyes = Set.filter (isEye (getToPlay gm) (latestPosition gm)) ps
+    eyes = Set.filter (isEye player pos) liberties
+    liberties = Set.foldr (Set.union . getLiberties) Set.empty (chainsForPlayer player pos)
+    player = getToPlay gm
+    pos = latestPosition gm
