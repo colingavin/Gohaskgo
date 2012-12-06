@@ -1,0 +1,14 @@
+#! /bin/sh
+
+PROG=uct_test
+OPTS=test_data/test2
+
+cabal configure --enable-executable-profiling
+cabal build
+dist/build/${PROG}/${PROG} ${OPTS} +RTS -p
+
+OUT=prof/${PROG}_$(date +"%m-%d_%H_%M").prof
+
+cp ${PROG}.prof ${OUT}
+rm ${PROG}.prof
+subl ${OUT}
