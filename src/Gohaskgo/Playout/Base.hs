@@ -26,7 +26,7 @@ makeRandomMoveFrom ps gm = do
         Left _ -> makeRandomMoveFrom (dropIndex ps idx) gm
 
 makeRandomMove :: IncompleteGame -> RVar AnyGame
-makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
+--makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
 makeRandomMove gm | getLastWasPass gm && shouldPassToWin gm = return $ pass gm
 makeRandomMove gm | shouldResign gm = return $ Left $ resign gm
 makeRandomMove gm = do

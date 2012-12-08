@@ -26,12 +26,13 @@ import Prelude hiding (elem, filter, null, foldr)
 import qualified Prelude (elem)
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic.Mutable as MV
+import qualified Data.Vector.Unboxed.Bit as U
+import Data.Bit
 import Data.Bits
 import Data.List hiding (elem, null, union, intersect, filter, insert, delete, foldr, (\\))
 
-import Gohaskgo.Utilities.Bit
 
-newtype PointSet = PointSet { getBits :: BitVector } deriving (Eq, Ord)
+newtype PointSet = PointSet { getBits :: U.Vector Bit } deriving (Eq, Ord)
 type Point = (Int, Int)
 
 -- Functions implementing a bijection (Int, Int) <-> Int such that 1..n^2 represent (1,1)..(n,n)
@@ -57,32 +58,32 @@ pointFromIndex = (pointFromIndexList !!)
 
 -- Creation
 empty :: Int -> PointSet
-empty = PointSet . flip V.replicate False . (^2)
+empty = PointSet . flip V.replicate (fromBool False) . (^2)
 
 singleton :: Int -> Point -> PointSet
-singleton n pt = PointSet $ V.generate (n^2) (== idx) where idx = pointToIndex pt
+singleton n pt = PointSet $ V.generate (n^2) (fromBool . (== idx)) where idx = pointToIndex pt
 
 fromList :: Int -> [Point] -> PointSet
-fromList n pts = PointSet $ V.generate (n^2) (\j -> (pointFromIndex j) `Prelude.elem` pts)
+fromList n pts = PointSet $ V.generate (n^2) (\j -> fromBool $ (pointFromIndex j) `Prelude.elem` pts)
 
 -- Access
 elem :: Point -> PointSet -> Bool
-elem p (PointSet ps) = ps V.! (pointToIndex p)
+elem p (PointSet ps) = toBool $ ps V.! (pointToIndex p)
 
 null :: PointSet -> Bool
-null = not . V.or . getBits
+null = not . U.or . getBits
 
 width :: PointSet -> Int
 width = floor . sqrt . fromIntegral . V.length . getBits
 
 size :: PointSet -> Int
-size = (V.foldr (\e c -> if e then c + 1 else c) 0) . getBits
+size = (V.foldr (\e c -> if toBool e then c + 1 else c) 0) . getBits
 
 someElement :: PointSet -> Maybe Point
 someElement (PointSet ps) = findElement ((V.length ps) - 1)
   where
     findElement (-1) = Nothing
-    findElement n = if ps V.! n then Just $ pointFromIndex n else findElement (n - 1)
+    findElement n = if toBool $ ps V.! n then Just $ pointFromIndex n else findElement (n - 1)
 
 someSingleton :: PointSet -> PointSet
 someSingleton ps = case someElement ps of
@@ -94,28 +95,28 @@ toList = foldr (:) []
 
 -- Set operations
 union :: PointSet -> PointSet -> PointSet
-union (PointSet as) (PointSet bs) = PointSet $ as .|. bs
+union (PointSet as) (PointSet bs) = PointSet $ U.union as bs
 
 intersection :: PointSet -> PointSet -> PointSet
-intersection (PointSet as) (PointSet bs) = PointSet $ as .&. bs
+intersection (PointSet as) (PointSet bs) = PointSet $ U.intersection as bs
 
 (\\) :: PointSet -> PointSet -> PointSet
-(PointSet as) \\ (PointSet bs) = PointSet $ as .&. (complement bs)
+(PointSet as) \\ (PointSet bs) = PointSet $ U.difference as bs
 
 filter :: (Point -> Bool) -> PointSet -> PointSet
-filter f (PointSet ps) = PointSet $ V.generate (V.length ps) (\n -> (ps V.! n) && (f . pointFromIndex) n)
+filter f (PointSet ps) = PointSet $ V.generate (V.length ps) (\n -> fromBool $ (toBool $ ps V.! n) && (f . pointFromIndex) n)
 
 foldr :: (Point -> a -> a) -> a -> PointSet -> a
-foldr f a (PointSet ps) = V.ifoldr (\n el curr -> if el then f (pointFromIndex n) curr else curr) a ps
+foldr f a (PointSet ps) = V.ifoldr (\n el curr -> if toBool el then f (pointFromIndex n) curr else curr) a ps
 
 -- Modification
 insert :: Point -> PointSet -> PointSet
 insert p s@(PointSet ps) = if p `elem` s then s
-    else PointSet $ V.modify (\v -> MV.write v (pointToIndex p) True) ps
+    else PointSet $ V.modify (\v -> MV.write v (pointToIndex p) (fromBool True)) ps
 
 delete :: Point -> PointSet -> PointSet
 delete p s@(PointSet ps) = if not $ p `elem` s then s
-    else PointSet $ V.modify (\v -> MV.write v (pointToIndex p) False) ps
+    else PointSet $ V.modify (\v -> MV.write v (pointToIndex p) (fromBool False)) ps
 
 -- Utility
 instance Show PointSet where
