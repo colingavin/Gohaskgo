@@ -10,6 +10,8 @@ import qualified Data.Set as Set
 import Data.Maybe
 import Debug.Trace (trace)
 
+import Gohaskgo.Utilities.PointSet (PointSet)
+import qualified Gohaskgo.Utilities.PointSet as PS
 import Gohaskgo.Utilities.General
 import Gohaskgo.Model.Base
 import Gohaskgo.Model.Point
@@ -22,13 +24,13 @@ data SearchNode = SearchNode {
     getMove :: Point,
     getWins :: Int,
     getVisits :: Int,
-    getAvailableMoves :: Set Point
+    getAvailableMoves :: PointSet
 } deriving Show
 
 prettyShowNode :: SearchNode -> String
 prettyShowNode (SearchNode _ m w v _) = "Move: " ++ (show m) ++ ". W/V: " ++ (show w) ++ "/" ++ (show v)
 
-setAvaliableMoves :: Set Point -> SearchNode -> SearchNode
+setAvaliableMoves :: PointSet -> SearchNode -> SearchNode
 setAvaliableMoves as (SearchNode p m w v _) = (SearchNode p m w v as)
 
 -- Update
@@ -66,7 +68,7 @@ searchDown tree gm = searchDown' (fromTree tree) gm
 searchDown' :: UCTZipper -> IncompleteGame -> (UCTZipper, IncompleteGame)
 searchDown' zipper gm
     -- While the current node has children and has been explored, traverse downward, directed by the UCB
-    | hasChildren zipper && (Set.null $ getAvailableMoves $ label zipper) = let selected = uctSelectChild zipper in
+    | hasChildren zipper && (PS.null $ getAvailableMoves $ label zipper) = let selected = uctSelectChild zipper in
         searchDown' selected (fromRight $ play gm $ getMove $ label selected)
     | otherwise = (zipper, gm)
 
@@ -92,16 +94,16 @@ uctScore node parentVisits = wins / visits + sqrt(2 * log(fromIntegral parentVis
 
 -- Add a node at the bottom of the tree by playing a random move, directed by playout heuristics
 expandNode :: UCTZipper -> IncompleteGame -> (UCTZipper, IncompleteGame)
-expandNode zipper gm = case firstAvaliableMove (Set.toList $ getAvailableMoves node) of
+expandNode zipper gm = case firstAvaliableMove (PS.toList $ getAvailableMoves node) of
     -- If there was no move to make, set avaliable moves to {}
     Nothing ->
-        let node' = setAvaliableMoves Set.empty node
+        let node' = setAvaliableMoves (PS.empty $ PS.width $ getAvailableMoves node) node
             zipper' = setLabel node' zipper
         in (zipper', gm)
     -- Otherwise, create the new search node with that move and append it to the bottom of the tree
     Just (ng, pt) ->
         let newChild = SearchNode (opponent $ getPlayer node) pt 0 0 (emptyPoints ng)
-            node' = setAvaliableMoves (Set.delete pt $ getAvailableMoves node) node
+            node' = setAvaliableMoves (PS.delete pt $ getAvailableMoves node) node
             zipper' = setLabel node' zipper
             zipper'' = insert (return newChild) $ children zipper'
         in (zipper'', ng)

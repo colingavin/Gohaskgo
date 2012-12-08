@@ -6,11 +6,14 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace (trace)
 
+import Gohaskgo.Utilities.PointSet (PointSet)
+import qualified Gohaskgo.Utilities.PointSet as PS
 import Gohaskgo.Playout.Heuristics
 import Gohaskgo.Utilities.General
 import Gohaskgo.Model.Base
 import Gohaskgo.Model.Point
 import Gohaskgo.Model.Gameplay
+import Gohaskgo.Model.Position
 
 
 makeRandomMoveFrom :: [Point] -> IncompleteGame -> RVar (Maybe (IncompleteGame, Point))
@@ -23,11 +26,11 @@ makeRandomMoveFrom ps gm = do
         Left _ -> makeRandomMoveFrom (dropIndex ps idx) gm
 
 makeRandomMove :: IncompleteGame -> RVar AnyGame
---makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
+makeRandomMove gm | (trace ((prettyPrintPosition $ latestPosition gm) ++ "\n") False) = undefined
 makeRandomMove gm | getLastWasPass gm && shouldPassToWin gm = return $ pass gm
 makeRandomMove gm | shouldResign gm = return $ Left $ resign gm
 makeRandomMove gm = do
-    plays <- mapM ((flip makeRandomMoveFrom gm) . Set.toList) $ reverse $ classifyMoves (emptyPoints gm) gm
+    plays <- mapM ((flip makeRandomMoveFrom gm) . PS.toList) $ reverse $ classifyMoves (emptyPoints gm) gm
     return $ case foldr mplus Nothing plays of
         Just (gm, _) -> Right gm
         Nothing -> pass gm

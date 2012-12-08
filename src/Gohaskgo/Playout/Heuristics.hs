@@ -8,6 +8,8 @@ import GHC.Exts
 
 import Debug.Trace (trace)
 
+import Gohaskgo.Utilities.PointSet (PointSet)
+import qualified Gohaskgo.Utilities.PointSet as PS
 import Gohaskgo.Playout.PositionAnalysis
 import Gohaskgo.Utilities.General
 import Gohaskgo.Model.Base
@@ -19,8 +21,8 @@ import Gohaskgo.Model.Position
 
 -- Access point to playout heurisitcs
 -- Given a set of open points and a game, groups the moves into good, fair, and bad, to be tried in order
-classifyMoves :: Set Point -> IncompleteGame -> [Set Point]
-classifyMoves ps gm = map Set.fromList $ groupWith (\p -> scores ! p) $ Set.toList ps
+classifyMoves :: PointSet -> IncompleteGame -> [PointSet]
+classifyMoves ps gm = map (PS.fromList n) $ groupWith (\p -> scores ! p) $ PS.toList ps
   where
     scores = snd $ runState (combinedHeuristics ps gm) emptyScores
     emptyScores = array ((1, 1), (n, n)) [((x, y), 0) | x <- [1..n], y <- [1..n]]
@@ -37,12 +39,12 @@ shouldPassToWin gm = (winner $ resign gm) == getToPlay gm
 shouldResign :: IncompleteGame -> Bool
 shouldResign gm = opponentsCount - playersCount > (getSize gm)^2 `div` 2 || (Set.size $ getHistory gm) > maxPlayoutLength !! (getSize gm)
   where
-    playersCount = Set.size $ allOfColor (getToPlay gm) pos
-    opponentsCount = Set.size $ allOfColor (opponent $ getToPlay gm) pos
+    playersCount = PS.size $ allOfColor (getToPlay gm) pos
+    opponentsCount = PS.size $ allOfColor (opponent $ getToPlay gm) pos
     pos = latestPosition gm
 
 -- A playout heuristic takes a set of open points and returns those that it considers good and bad
-type PlayoutHeuristic = Set Point -> IncompleteGame -> State (Array Point Int) ()
+type PlayoutHeuristic = PointSet -> IncompleteGame -> State (Array Point Int) ()
 
 -- All the playout heuristics to try in order, may be weighted later
 allPlayoutHeuristics :: [PlayoutHeuristic]
@@ -53,45 +55,45 @@ combinedHeuristics :: PlayoutHeuristic
 combinedHeuristics ps gm = foldr (>>) (return ()) $ map (\h -> h ps gm) allPlayoutHeuristics
 
 -- Utility method to adjust the set of scores
-adjustScores :: Int -> Set Point -> State (Array Point Int) ()
+adjustScores :: Int -> PointSet -> State (Array Point Int) ()
 adjustScores dx ps = do
   board <- get
-  let adjustment = [(p, (board ! p) + dx) | p <- Set.toList ps]
+  let adjustment = [(p, (board ! p) + dx) | p <- PS.toList ps]
   put $ board // adjustment
 
 -- Heuristic to avoid self atari
 selfAtariHeuristic :: PlayoutHeuristic
-selfAtariHeuristic ps gm = adjustScores (-1) $ Set.filter (\p -> isSelfAtari p player pos) ps
+selfAtariHeuristic ps gm = adjustScores (-1) $ PS.filter (\p -> isSelfAtari p player pos) ps
   where
     pos = latestPosition gm
     player = getToPlay gm
 
 -- Heuristic to capture opposing stones
 captureHeuristic :: PlayoutHeuristic
-captureHeuristic ps gm = adjustScores 1 $ Set.intersection capturePoints ps
+captureHeuristic ps gm = adjustScores 1 $ PS.intersection capturePoints ps
   where
-    capturePoints = flattenSet $ Set.map capturePoint (chainsForPlayer opp pos)
+    capturePoints = Set.foldr (PS.union . capturePoint) (PS.empty $ PS.width ps) (chainsForPlayer opp pos)
     pos = latestPosition gm
     opp = opponent $ getToPlay gm
 
 -- Heuristic to avoid playing on lines 1 and 2
 linesHeuristic :: PlayoutHeuristic
-linesHeuristic ps gm = adjustScores (-1) $ Set.filter (isOnBadLine boardSize) ps
+linesHeuristic ps gm = adjustScores (-1) $ PS.filter (isOnBadLine boardSize) ps
   where
     isOnBadLine n (x, y) = x == 1 || y == 1 || x == 2 || y == 2 || x == n || y == n || x == n - 1 || y == n - 1
     boardSize = getSize gm
 
 -- Heuristic to save own chains that are in atari
 escapeHeuristic :: PlayoutHeuristic
-escapeHeuristic ps gm = adjustScores 1 $ Set.intersection escapePoints ps
+escapeHeuristic ps gm = adjustScores 1 $ PS.intersection escapePoints ps
   where
-    escapePoints = flattenSet $ Set.map capturePoint (chainsForPlayer (getToPlay gm) (latestPosition gm))
+    escapePoints = Set.foldr (PS.union . capturePoint) (PS.empty $ PS.width ps) (chainsForPlayer (getToPlay gm) (latestPosition gm))
 
 -- Heuristic to avoid playing in own eyes
 eyesHeuristic :: PlayoutHeuristic
 eyesHeuristic ps gm = adjustScores (-1) eyes
   where
-    eyes = Set.filter (isEye player pos) liberties
-    liberties = Set.foldr (Set.union . getLiberties) Set.empty (chainsForPlayer player pos)
+    eyes = PS.filter (isEye player pos) liberties
+    liberties = Set.foldr (PS.union . getLiberties) (PS.empty $ PS.width ps) (chainsForPlayer player pos)
     player = getToPlay gm
     pos = latestPosition gm

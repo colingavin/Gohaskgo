@@ -24,5 +24,5 @@ main = do
             putStrLn "Evaluating:"
             putStrLn $ prettyPrintPosition pos
             let gm = makeGameFromPosition pos Black
-            response <- sampleFrom mwc $ uctRespond gm 1000 1
+            response <- sampleFrom mwc $ uctRespond gm 10 1
             putStrLn $ "Will respond by playing at: " ++ (show response)

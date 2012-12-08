@@ -4,6 +4,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Array
 
+import Gohaskgo.Utilities.PointSet (PointSet)
+import qualified Gohaskgo.Utilities.PointSet as PS
 import Gohaskgo.Model.Base
 
 
@@ -19,14 +21,14 @@ allowedPoint :: Int -> Point -> Bool
 allowedPoint n (x, y) = (x > 0) && (y > 0) && (x <= n) && (y <= n)
 
 -- Memoize the lists of adjacent points
-adjacentPointsArrays :: [Array Point (Set Point)]
+adjacentPointsArrays :: [Array Point PointSet]
 adjacentPointsArrays = map adjacentPointsArray [0..]
   where
     adjacentPointsArray n = array ((1, 1), (n, n)) $ [((x, y), adjacentPoints' n x y) | x <- [1..n], y <- [1..n]]
-    adjacentPoints' n x y = Set.fromList $ filter (allowedPoint n) $ [(x, y + 1), (x + 1, y), (x, y - 1), (x - 1, y)]
+    adjacentPoints' n x y = PS.fromList n $ filter (allowedPoint n) $ [(x, y + 1), (x + 1, y), (x, y - 1), (x - 1, y)]
 
 -- Get all the adjacent points of a given point on the specified sized board
-adjacentPoints :: Int -> Point -> Set Point
+adjacentPoints :: Int -> Point -> PointSet
 adjacentPoints n pt = (adjacentPointsArrays !! n) ! pt
 
 -- Create empty board of a given size indexed by Points

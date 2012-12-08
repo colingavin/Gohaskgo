@@ -8,9 +8,11 @@ cabal-version: >= 1.2
 executable uct_test
     main-is:            UCTTest.hs
     hs-source-dirs:     src
-    build-depends:      base, mtl, array, containers, parsec, rvar, random-fu, mwc-random, random-source, rosezipper
+    build-depends:      base, mtl, array, containers, vector, parsec, rvar, random-fu, mwc-random, random-source, rosezipper
     other-modules:      Gohaskgo.Utilities.AsciiBoardParser, 
                         Gohaskgo.Utilities.General,
+                        Gohaskgo.Utilities.Bit,
+                        Gohaskgo.Utilities.PointSet,
                         Gohaskgo.Playout.Base,
                         Gohaskgo.Playout.Heuristics,
                         Gohaskgo.Playout.PositionAnalysis,

@@ -10,6 +10,8 @@ import qualified Data.Set as Set
 import Control.Monad.Error
 import Debug.Trace (trace)
 
+import Gohaskgo.Utilities.PointSet (PointSet)
+import qualified Gohaskgo.Utilities.PointSet as PS
 import Gohaskgo.Model.Base
 import Gohaskgo.Model.Point
 import Gohaskgo.Model.Chain
@@ -37,7 +39,7 @@ play :: IncompleteGame -> Point -> Either PlayError IncompleteGame
 play (IncompleteGame pos hist color _) pt = do
     newPos <- positionByPlaying color pt pos
     let cleared = positionByClearing (opponent color) newPos
-    let selfCapture = any (Set.null . getLiberties) $ Set.toList (chainsForPlayer color cleared)
+    let selfCapture = Set.foldr ((||) . PS.null . getLiberties) False $ chainsForPlayer color cleared
     if selfCapture
         then throwError Suicide
         else if Set.member (getHash cleared) hist
@@ -53,7 +55,7 @@ pass (IncompleteGame pos hist color p) = do
 resign :: IncompleteGame -> FinishedGame
 resign (IncompleteGame pos _ _ _) = FinishedGame pos
 
-emptyPoints :: IncompleteGame -> Set Point
+emptyPoints :: IncompleteGame -> PointSet
 emptyPoints = (allOfColor Neither) . latestPosition
 
 -- FinishedGames only keep their last position, they also can be scored
