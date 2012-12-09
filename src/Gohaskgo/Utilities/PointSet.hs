@@ -23,17 +23,37 @@ module Gohaskgo.Utilities.PointSet (
     ) where
 
 import Prelude hiding (elem, filter, null, foldr)
-import qualified Prelude (elem)
+import qualified Prelude (elem, foldr, filter)
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic.Mutable as MV
-import qualified Data.Vector.Unboxed.Bit as U
-import Data.Bit
 import Data.Bits
+import Data.Word
 import Data.List hiding (elem, null, union, intersect, filter, insert, delete, foldr, (\\))
 
+import Debug.Trace (trace)
 
-newtype PointSet = PointSet { getBits :: U.Vector Bit } deriving (Eq, Ord)
+
+newtype PointSet = PointSet { getBits :: V.Vector Word32 } deriving (Eq, Ord)
 type Point = (Int, Int)
+
+-- Utility
+instance Show PointSet where
+    show ps = "fromList " ++ (show $ toList ps)
+
+widthToBlocks :: Int -> Int
+widthToBlocks n = ceiling ((fromIntegral n)^2 / 32)
+
+blockForIndex :: Int -> Int
+blockForIndex n = n `div` 32
+
+offsetForIndex :: Int -> Int
+offsetForIndex n = n `mod` 32
+
+firstSetIndex :: Word32 -> Int
+firstSetIndex n = ffs n 0
+  where
+    ffs n i | n .&. 1 == 0 = ffs (shiftR n 1) (i + 1)
+            | otherwise = i
 
 -- Functions implementing a bijection (Int, Int) <-> Int such that 1..n^2 represent (1,1)..(n,n)
 -- Using these functions means that functions like `elem` don't need to know the size of the board
@@ -58,32 +78,41 @@ pointFromIndex = (pointFromIndexList !!)
 
 -- Creation
 empty :: Int -> PointSet
-empty = PointSet . flip V.replicate (fromBool False) . (^2)
+empty = PointSet . flip V.replicate 0 . widthToBlocks
 
 singleton :: Int -> Point -> PointSet
-singleton n pt = PointSet $ V.generate (n^2) (fromBool . (== idx)) where idx = pointToIndex pt
+singleton n pt = PointSet $ V.generate (widthToBlocks n) (\b -> if b == block then bit offset else 0)
+  where 
+    block = blockForIndex idx
+    offset = offsetForIndex idx
+    idx = pointToIndex pt
 
 fromList :: Int -> [Point] -> PointSet
-fromList n pts = PointSet $ V.generate (n^2) (\j -> fromBool $ (pointFromIndex j) `Prelude.elem` pts)
+fromList n pts = PointSet $ V.generate (widthToBlocks n) blockFromList
+  where
+    blockFromList j = Prelude.foldr (\offset curr -> if (pointFromIndex (start + offset)) `Prelude.elem` pts then shiftL (curr .|. 1) 1 else shiftL curr 1) 0 [0..31]
+      where start = 32*j
 
 -- Access
 elem :: Point -> PointSet -> Bool
-elem p (PointSet ps) = toBool $ ps V.! (pointToIndex p)
+elem p (PointSet ps) = testBit (ps V.! (blockForIndex idx)) (offsetForIndex idx)
+  where idx = pointToIndex p
 
 null :: PointSet -> Bool
-null = not . U.or . getBits
+null = (== 0) . V.sum . getBits
 
 width :: PointSet -> Int
-width = floor . sqrt . fromIntegral . V.length . getBits
+width = floor . sqrt . fromIntegral . (*32) . V.length . getBits
 
 size :: PointSet -> Int
-size = (V.foldr (\e c -> if toBool e then c + 1 else c) 0) . getBits
+size = (V.foldr ((+) . popCount) 0) . getBits
 
 someElement :: PointSet -> Maybe Point
-someElement (PointSet ps) = findElement ((V.length ps) - 1)
-  where
-    findElement (-1) = Nothing
-    findElement n = if toBool $ ps V.! n then Just $ pointFromIndex n else findElement (n - 1)
+someElement (PointSet ps) = do
+    idx <- V.findIndex (/= 0) ps
+    let block = ps V.! idx
+    let offset = firstSetIndex block
+    return $ pointFromIndex (32*idx + offset)
 
 someSingleton :: PointSet -> PointSet
 someSingleton ps = case someElement ps of
@@ -94,30 +123,46 @@ toList :: PointSet -> [Point]
 toList = foldr (:) []
 
 -- Set operations
+elementwise :: (Word32 -> Word32 -> Word32) -> PointSet -> PointSet -> PointSet
+elementwise op (PointSet as) (PointSet bs) = PointSet $ V.generate (V.length as) (\n -> (as V.! n) `op` (bs V.! n))
+
 union :: PointSet -> PointSet -> PointSet
-union (PointSet as) (PointSet bs) = PointSet $ U.union as bs
+union = elementwise (.|.)
 
 intersection :: PointSet -> PointSet -> PointSet
-intersection (PointSet as) (PointSet bs) = PointSet $ U.intersection as bs
+intersection  = elementwise (.&.)
 
 (\\) :: PointSet -> PointSet -> PointSet
-(PointSet as) \\ (PointSet bs) = PointSet $ U.difference as bs
+(\\) = elementwise without
+  where
+    a `without` b = a .&. (complement b)
 
 filter :: (Point -> Bool) -> PointSet -> PointSet
-filter f (PointSet ps) = PointSet $ V.generate (V.length ps) (\n -> fromBool $ (toBool $ ps V.! n) && (f . pointFromIndex) n)
+filter f ps = fromList (width ps) (Prelude.filter f $ toList ps)
 
 foldr :: (Point -> a -> a) -> a -> PointSet -> a
-foldr f a (PointSet ps) = V.ifoldr (\n el curr -> if toBool el then f (pointFromIndex n) curr else curr) a ps
+foldr f a (PointSet ps) = V.ifoldr eachInBlock a ps
+  where
+    eachInBlock idx block curr = Prelude.foldr (\n c -> if testBit block n then f (pointFromIndex $ idx + n) c else c) curr [0..31]
 
 -- Modification
 insert :: Point -> PointSet -> PointSet
 insert p s@(PointSet ps) = if p `elem` s then s
-    else PointSet $ V.modify (\v -> MV.write v (pointToIndex p) (fromBool True)) ps
+    else PointSet $ V.modify insertInto ps
+  where 
+    insertInto v = do
+        let idx = pointToIndex p
+        block <- MV.read v (blockForIndex idx)
+        let modified = setBit block (offsetForIndex idx)
+        MV.write v (blockForIndex idx) modified
 
 delete :: Point -> PointSet -> PointSet
 delete p s@(PointSet ps) = if not $ p `elem` s then s
-    else PointSet $ V.modify (\v -> MV.write v (pointToIndex p) (fromBool False)) ps
+    else PointSet $ V.modify removeFrom ps
+  where 
+    removeFrom v = do
+        let idx = pointToIndex p
+        block <- MV.read v (blockForIndex idx)
+        let modified = clearBit block (offsetForIndex idx)
+        MV.write v (blockForIndex idx) modified
 
--- Utility
-instance Show PointSet where
-    show ps = "fromList " ++ (show $ toList ps)
