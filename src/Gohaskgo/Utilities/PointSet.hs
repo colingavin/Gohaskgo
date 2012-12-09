@@ -33,12 +33,12 @@ import Data.List hiding (elem, null, union, intersect, filter, insert, delete, f
 import Debug.Trace (trace)
 
 
-newtype PointSet = PointSet { getBits :: V.Vector Word32 } deriving (Eq, Ord)
+newtype PointSet = PointSet { getBits :: V.Vector Word32 } deriving (Eq, Ord, Show)
 type Point = (Int, Int)
 
 -- Utility
-instance Show PointSet where
-    show ps = "fromList " ++ (show $ toList ps)
+--instance Show PointSet where
+--    show ps = "fromList " ++ (show $ toList ps)
 
 widthToBlocks :: Int -> Int
 widthToBlocks n = ceiling ((fromIntegral n)^2 / 32)
@@ -74,7 +74,15 @@ pointFromIndexList = map findPoint [0..]
         l = floor $ sqrt (fromIntegral n)
 
 pointFromIndex :: Int -> Point
-pointFromIndex = (pointFromIndexList !!)
+pointFromIndex n = findPoint n
+  where
+    findPoint n = case compare n (l + l^2) of
+        EQ -> (l + 1, l + 1)
+        GT -> (l + 1, 1 - n + 2*l + l^2)
+        LT -> (n - l^2 + 1, l + 1)
+      where
+        l = floor $ sqrt (fromIntegral n)
+
 
 -- Creation
 empty :: Int -> PointSet
@@ -88,9 +96,9 @@ singleton n pt = PointSet $ V.generate (widthToBlocks n) (\b -> if b == block th
     idx = pointToIndex pt
 
 fromList :: Int -> [Point] -> PointSet
-fromList n pts = PointSet $ V.generate (widthToBlocks n) blockFromList
+fromList n pts = PointSet $ V.generate (widthToBlocks n) (blockFromList)
   where
-    blockFromList j = Prelude.foldr (\offset curr -> if (pointFromIndex (start + offset)) `Prelude.elem` pts then shiftL (curr .|. 1) 1 else shiftL curr 1) 0 [0..31]
+    blockFromList j = Prelude.foldr (\offset curr -> if (pointFromIndex (start + offset)) `Prelude.elem` pts then setBit curr offset else curr) 0 [0..31]
       where start = 32*j
 
 -- Access
@@ -143,7 +151,8 @@ filter f ps = fromList (width ps) (Prelude.filter f $ toList ps)
 foldr :: (Point -> a -> a) -> a -> PointSet -> a
 foldr f a (PointSet ps) = V.ifoldr eachInBlock a ps
   where
-    eachInBlock idx block curr = Prelude.foldr (\n c -> if testBit block n then f (pointFromIndex $ idx + n) c else c) curr [0..31]
+--    eachInBlock idx block curr = Prelude.foldr (\n c -> if trace ("idx: " ++ (show idx) ++ " n: " ++ (show n)) (testBit block n) then f (pointFromIndex $ trace (show $ 32*idx + n) (32*idx + n)) c else c) curr [0..31]
+    eachInBlock idx block curr = Prelude.foldr (\n c -> if testBit block n then f (pointFromIndex $ 32*idx + n) c else c) curr [0..31]
 
 -- Modification
 insert :: Point -> PointSet -> PointSet
