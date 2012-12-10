@@ -36,14 +36,14 @@ positionByPlaying :: Player -> Point -> Position -> Either PlayError Position
 positionByPlaying color pt pos
     | not $ allowedPoint n pt = Left Other
     | board ! pt /= Neither = Left OccupiedPoint
-    | color == White = Right $ Position n newBoard (updateLiberties Black newBoard bs) merged zob newHash allbs (PS.insert pt allws) newOpens
-    | color == Black = Right $ Position n newBoard merged (updateLiberties White newBoard ws) zob newHash (PS.insert pt allbs) allws newOpens
+    | color == White = Right $ Position n newBoard (updateLiberties Black newOpens bs) merged zob newHash allbs (PS.insert pt allws) newOpens
+    | color == Black = Right $ Position n newBoard merged (updateLiberties White newOpens ws) zob newHash (PS.insert pt allbs) allws newOpens
   where
     newBoard = board // [(pt, color)]
     newHash = changePoint pt Neither color zob hash
     newOpens = PS.delete pt $ getOpenPoints pos
     -- Merge the chains that have pt as a liberty with pt and add them to the rest
-    merged = Set.insert (insertPoint pt color board n (joinChains n withLiberty)) withoutLiberty
+    merged = Set.insert (insertPoint pt color newOpens n (joinChains n withLiberty)) withoutLiberty
     -- Find the chains that do and don't have pt as a liberty
     (withLiberty, withoutLiberty) = Set.partition (\(Chain _ ls _) -> PS.elem pt ls) (chainsForPlayer color pos)
     -- Get fields from pos
@@ -57,26 +57,26 @@ positionByPlaying color pt pos
     allws = getWhitePoints pos
 
 -- Insert a point into a chain and update its liberties
-insertPoint :: Point -> Player -> Array Point Player -> Int -> Chain -> Chain
-insertPoint p color board n (Chain ps ls ns)
+insertPoint :: Point -> Player -> PointSet -> Int -> Chain -> Chain
+insertPoint p color empties n (Chain ps ls ns)
     | PS.null ps = Chain newPoints newLiberties newNeighbors
     | otherwise = Chain newPoints ((PS.union newLiberties (PS.delete p ls)) PS.\\ ps) ((PS.union newNeighbors (PS.delete p ns)) PS.\\ ps)
   where
     newNeighbors = adjacentPoints n p
-    newLiberties = PS.filter ((== Neither) . (board !)) newNeighbors
+    newLiberties = PS.intersection empties newNeighbors
     newPoints = PS.insert p ps
 
 -- Update the liberties of the chains of a given color
-updateLiberties :: Player -> Array Point Player -> Set Chain -> Set Chain
-updateLiberties color board chs = Set.map updateOne chs
+updateLiberties :: Player -> PointSet -> Set Chain -> Set Chain
+updateLiberties color empties chs = Set.map updateOne chs
   where
-    updateOne (Chain ps _ ns) = Chain ps (PS.filter ((== Neither) . (board !)) ns) ns
+    updateOne (Chain ps _ ns) = Chain ps (PS.intersection empties ns) ns
 
 -- Create a new position by clearing all captured chains of a given color
 positionByClearing :: Player -> Position -> Position
 positionByClearing color pos
-    | color == White = Position n newBoard (updateLiberties Black newBoard bs) (ws Set.\\ capturedChains) zob newHash allbs (allws PS.\\ capturedPoints) newOpens
-    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newBoard ws) zob newHash (allbs PS.\\ capturedPoints) allws newOpens
+    | color == White = Position n newBoard (updateLiberties Black newOpens bs) (ws Set.\\ capturedChains) zob newHash allbs (allws PS.\\ capturedPoints) newOpens
+    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newOpens ws) zob newHash (allbs PS.\\ capturedPoints) allws newOpens
     | color == Neither = error "Can't clear empty."
   where
     capturedChains = Set.filter (\ch -> PS.null (getLiberties ch)) (chainsForPlayer color pos)
