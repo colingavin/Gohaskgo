@@ -28,8 +28,5 @@ joinChains n chs = Set.foldr joinPair (Chain emp emp emp) chs
 surroundingPoints :: Int -> PointSet -> PointSet
 surroundingPoints n ps = (PS.foldr (\p curr -> PS.union (adjacentPoints n p) curr) (PS.empty n) ps) PS.\\ ps
 
-libertiesOnBoard :: Int -> PointSet -> Array Point Player -> PointSet
-libertiesOnBoard n ps board = PS.filter ((== Neither) . (board !)) (surroundingPoints n ps)
-
 removeChain :: Chain -> Array Point Player -> Array Point Player
 removeChain (Chain ps _ _) board = board // map (flip pair Neither) (PS.toList ps)
