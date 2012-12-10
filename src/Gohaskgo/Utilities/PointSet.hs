@@ -28,17 +28,18 @@ import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic.Mutable as MV
 import Data.Bits
 import Data.Word
+import Data.Foldable (forM_)
 import Data.List hiding (elem, null, union, intersect, filter, insert, delete, foldr, (\\))
 
 import Debug.Trace (trace)
 
 
-newtype PointSet = PointSet { getBits :: V.Vector Word32 } deriving (Eq, Ord, Show)
+newtype PointSet = PointSet { getBits :: V.Vector Word32 } deriving (Eq, Ord)
 type Point = (Int, Int)
 
 -- Utility
---instance Show PointSet where
---    show ps = "fromList " ++ (show $ toList ps)
+instance Show PointSet where
+    show ps = "fromList " ++ (show $ toList ps)
 
 widthToBlocks :: Int -> Int
 widthToBlocks n = ceiling ((fromIntegral n)^2 / 32)
@@ -63,16 +64,6 @@ pointToIndex (n, m)
  | n > m = n^2 - m
  | n < m = m * (m - 2) + n
 
-pointFromIndexList :: [Point]
-pointFromIndexList = map findPoint [0..]
-  where
-    findPoint n = case compare n (l + l^2) of
-        EQ -> (l + 1, l + 1)
-        GT -> (l + 1, 1 - n + 2*l + l^2)
-        LT -> (n - l^2 + 1, l + 1)
-      where
-        l = floor $ sqrt (fromIntegral n)
-
 pointFromIndex :: Int -> Point
 pointFromIndex n = findPoint n
   where
@@ -95,11 +86,13 @@ singleton n pt = PointSet $ V.generate (widthToBlocks n) (\b -> if b == block th
     offset = offsetForIndex idx
     idx = pointToIndex pt
 
+
 fromList :: Int -> [Point] -> PointSet
 fromList n pts = PointSet $ V.generate (widthToBlocks n) (blockFromList)
   where
     blockFromList j = Prelude.foldr (\offset curr -> if (pointFromIndex (start + offset)) `Prelude.elem` pts then setBit curr offset else curr) 0 [0..31]
       where start = 32*j
+
 
 -- Access
 elem :: Point -> PointSet -> Bool
@@ -146,12 +139,19 @@ intersection  = elementwise (.&.)
     a `without` b = a .&. (complement b)
 
 filter :: (Point -> Bool) -> PointSet -> PointSet
-filter f ps = fromList (width ps) (Prelude.filter f $ toList ps)
+filter f (PointSet ps) = PointSet $ V.modify filterMod ps
+  where
+    filterMod v = forM_ [0 .. (V.length ps - 1)] $ \idx -> do
+        forM_ [0..31] $ \offset -> do
+            block <- MV.read v idx
+            let pointer = idx + offset
+            if (testBit block offset) && f (pointFromIndex pointer)
+                then MV.write v idx (setBit block offset)
+                else MV.write v idx (clearBit block offset)
 
 foldr :: (Point -> a -> a) -> a -> PointSet -> a
 foldr f a (PointSet ps) = V.ifoldr eachInBlock a ps
   where
---    eachInBlock idx block curr = Prelude.foldr (\n c -> if trace ("idx: " ++ (show idx) ++ " n: " ++ (show n)) (testBit block n) then f (pointFromIndex $ trace (show $ 32*idx + n) (32*idx + n)) c else c) curr [0..31]
     eachInBlock idx block curr = Prelude.foldr (\n c -> if testBit block n then f (pointFromIndex $ 32*idx + n) c else c) curr [0..31]
 
 -- Modification
