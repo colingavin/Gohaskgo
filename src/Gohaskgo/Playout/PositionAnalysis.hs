@@ -23,9 +23,10 @@ capturePoint ch = if (PS.size $ getLiberties ch) == 1 then getLiberties ch else 
 
 -- Determines whether a given position has an empty neighbor
 hasLibertyOrFriend :: Point -> Player -> Position -> Bool
-hasLibertyOrFriend p color pos = not $ PS.null $ PS.filter (\neighbor -> (board ! neighbor) `elem` [Neither, color]) (adjacentPoints n p)
+--hasLibertyOrFriend p color pos = not $ PS.null $ PS.filter (\neighbor -> (board ! neighbor) `elem` [Neither, color]) (adjacentPoints n p)
+hasLibertyOrFriend p color pos = not $ PS.null $ PS.intersection friends (adjacentPoints n p)
   where
-    board = getBoard pos
+    friends = allOfColor color pos
     n = getBoardSize pos
 
 isSelfAtari :: Point -> Player -> Position -> Bool
@@ -34,8 +35,9 @@ isSelfAtari p player pos = not $ Set.null $ Set.filter (isSelfAtariForChain p) (
     isSelfAtariForChain p ch = PS.size (getLiberties ch) == 2 && not (hasLibertyOrFriend p player pos)
 
 isEye :: Player -> Position -> Point -> Bool
-isEye color pos p = PS.null $ PS.filter ((/= color) . (board !)) (adjacentPoints n p)
+isEye color pos p = (PS.size $ PS.intersection adjs friends) == (PS.size adjs)
   where
-    board = getBoard pos
+    adjs = adjacentPoints n p
+    friends = allOfColor color pos
     n = getBoardSize pos
 

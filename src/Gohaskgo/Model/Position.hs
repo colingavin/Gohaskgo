@@ -16,7 +16,6 @@ import Gohaskgo.Model.Zobrist
 -- Positions are the main representation of the state of a board
 data Position = Position {
     getBoardSize :: Int,
-    getBoard :: Array Point Player,
     getBlackChains :: Set Chain,
     getWhiteChains :: Set Chain,
     getZobristData :: ZobristData,
@@ -28,33 +27,31 @@ data Position = Position {
 
 -- Create a new, empty position
 emptyPosition :: Int -> ZobristData -> Position
-emptyPosition n zob = Position n board Set.empty Set.empty zob (emptyBoardHash zob) (PS.empty n) (PS.empty n) $ PS.fromList n (indices board)
-  where board = emptyBoard n
+emptyPosition n zob = Position n Set.empty Set.empty zob (emptyBoardHash zob) (PS.empty n) (PS.empty n) $ PS.fromList n (boardPoints n)
 
 -- Play at a point with a color (note, no pattern for Neither, this should be a crash)
 positionByPlaying :: Player -> Point -> Position -> Either PlayError Position
 positionByPlaying color pt pos
     | not $ allowedPoint n pt = Left Other
-    | board ! pt /= Neither = Left OccupiedPoint
-    | color == White = Right $ Position n newBoard (updateLiberties Black newOpens bs) merged zob newHash allbs (PS.insert pt allws) newOpens
-    | color == Black = Right $ Position n newBoard merged (updateLiberties White newOpens ws) zob newHash (PS.insert pt allbs) allws newOpens
+    | not $ PS.elem pt opens = Left OccupiedPoint
+    | color == White = Right $ Position n (updateLiberties Black newOpens bs) merged zob newHash allbs (PS.insert pt allws) newOpens
+    | color == Black = Right $ Position n merged (updateLiberties White newOpens ws) zob newHash (PS.insert pt allbs) allws newOpens
   where
-    newBoard = board // [(pt, color)]
     newHash = changePoint pt Neither color zob hash
-    newOpens = PS.delete pt $ getOpenPoints pos
+    newOpens = PS.delete pt opens
     -- Merge the chains that have pt as a liberty with pt and add them to the rest
     merged = Set.insert (insertPoint pt color newOpens n (joinChains n withLiberty)) withoutLiberty
     -- Find the chains that do and don't have pt as a liberty
     (withLiberty, withoutLiberty) = Set.partition (\(Chain _ ls _) -> PS.elem pt ls) (chainsForPlayer color pos)
     -- Get fields from pos
     n = getBoardSize pos
-    board = getBoard pos
     bs = getBlackChains pos
     ws = getWhiteChains pos
     zob = getZobristData pos
     hash = getHash pos
     allbs = getBlackPoints pos
     allws = getWhitePoints pos
+    opens = getOpenPoints pos
 
 -- Insert a point into a chain and update its liberties
 insertPoint :: Point -> Player -> PointSet -> Int -> Chain -> Chain
@@ -75,19 +72,17 @@ updateLiberties color empties chs = Set.map updateOne chs
 -- Create a new position by clearing all captured chains of a given color
 positionByClearing :: Player -> Position -> Position
 positionByClearing color pos
-    | color == White = Position n newBoard (updateLiberties Black newOpens bs) (ws Set.\\ capturedChains) zob newHash allbs (allws PS.\\ capturedPoints) newOpens
-    | color == Black = Position n newBoard (bs Set.\\ capturedChains) (updateLiberties White newOpens ws) zob newHash (allbs PS.\\ capturedPoints) allws newOpens
+    | color == White = Position n (updateLiberties Black newOpens bs) (ws Set.\\ capturedChains) zob newHash allbs (allws PS.\\ capturedPoints) newOpens
+    | color == Black = Position n (bs Set.\\ capturedChains) (updateLiberties White newOpens ws) zob newHash (allbs PS.\\ capturedPoints) allws newOpens
     | color == Neither = error "Can't clear empty."
   where
     capturedChains = Set.filter (\ch -> PS.null (getLiberties ch)) (chainsForPlayer color pos)
     joined = joinChains n capturedChains
     capturedPoints = getPoints joined
     newHash = PS.foldr (\pt accum -> changePoint pt color Neither zob hash) hash capturedPoints
-    newBoard = removeChain joined board
     newOpens = PS.union (getOpenPoints pos) capturedPoints
     -- Get fields from pos
     n = getBoardSize pos
-    board = getBoard pos
     bs = getBlackChains pos
     ws = getWhiteChains pos
     zob = getZobristData pos
@@ -126,7 +121,7 @@ allOfColor Neither = getOpenPoints
 scorePosition :: Position -> (Int, Int)
 scorePosition pos = (scoreColor Black, scoreColor White)
   where
-    allPts = Set.fromList (indices board)
+    allPts = Set.fromList $ boardPoints n
     emptyChains = emptyConnectedRegions [] (allOfColor Neither pos) pos
     scoreEmptyChains chs color = foldr ((+) . PS.size) 0 $ filter isInTerritory chs
       where
@@ -134,7 +129,6 @@ scorePosition pos = (scoreColor Black, scoreColor White)
     scoreColor color = scoreEmptyChains emptyChains color + PS.size (allOfColor color pos)
     -- Get fields from pos
     n = getBoardSize pos
-    board = getBoard pos
     bs = getBlackChains pos
     ws = getWhiteChains pos
 
@@ -156,19 +150,21 @@ expandEmptyChain ch pos
     | PS.null libs = ch
     | otherwise = expandEmptyChain (PS.union ch libs) pos
   where
-    libs = (libertiesOnBoard (getBoardSize pos) ch (getBoard pos)) PS.\\ ch
+    libs = (PS.intersection ch (getOpenPoints pos)) PS.\\ ch
 
 -- Create a nice string representation of the position
 prettyPrintPosition :: Position -> String
 prettyPrintPosition pos = intercalate "\n" (map stringForRow [1 .. n])
   where
     stringForRow x = intersperse ' ' $ map (charForPoint x) [1 .. n]
-    charForPoint x y = case board ! (x, y) of
-        Black -> '●'
-        White -> '○'
-        Neither -> '+'
+    charForPoint x y = 
+        let pt = (x, y) in
+            case (PS.elem pt whites, PS.elem pt blacks, PS.elem pt empties) of
+                (_, True, _) -> '●'
+                (True, _, _) -> '○'
+                otherwise -> '+'
     -- Get fields from pos
     n = getBoardSize pos
-    board = getBoard pos
-    bs = getBlackChains pos
-    ws = getWhiteChains pos
+    whites = getWhitePoints pos
+    blacks = getBlackPoints pos
+    empties = getOpenPoints pos

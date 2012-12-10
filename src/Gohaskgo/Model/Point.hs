@@ -34,3 +34,6 @@ adjacentPoints n pt = (adjacentPointsArrays !! n) ! pt
 -- Create empty board of a given size indexed by Points
 emptyBoard :: Int -> Array Point Player
 emptyBoard n = array ((1,1), (n, n)) [((x, y), Neither) | x <- [1..n], y <- [1..n]]
+
+boardPoints :: Int -> [Point]
+boardPoints n = range ((1, 1), (n, n))
