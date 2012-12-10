@@ -23,7 +23,6 @@ capturePoint ch = if (PS.size $ getLiberties ch) == 1 then getLiberties ch else 
 
 -- Determines whether a given position has an empty neighbor
 hasLibertyOrFriend :: Point -> Player -> Position -> Bool
---hasLibertyOrFriend p color pos = not $ PS.null $ PS.filter (\neighbor -> (board ! neighbor) `elem` [Neither, color]) (adjacentPoints n p)
 hasLibertyOrFriend p color pos = not $ PS.null $ PS.intersection friends (adjacentPoints n p)
   where
     friends = allOfColor color pos
