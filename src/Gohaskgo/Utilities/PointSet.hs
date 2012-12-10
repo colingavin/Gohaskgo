@@ -86,13 +86,11 @@ singleton n pt = PointSet $ V.generate (widthToBlocks n) (\b -> if b == block th
     offset = offsetForIndex idx
     idx = pointToIndex pt
 
-
 fromList :: Int -> [Point] -> PointSet
 fromList n pts = PointSet $ V.generate (widthToBlocks n) (blockFromList)
   where
     blockFromList j = Prelude.foldr (\offset curr -> if (pointFromIndex (start + offset)) `Prelude.elem` pts then setBit curr offset else curr) 0 [0..31]
       where start = 32*j
-
 
 -- Access
 elem :: Point -> PointSet -> Bool
@@ -125,7 +123,12 @@ toList = foldr (:) []
 
 -- Set operations
 elementwise :: (Word32 -> Word32 -> Word32) -> PointSet -> PointSet -> PointSet
-elementwise op (PointSet as) (PointSet bs) = PointSet $ V.generate (V.length as) (\n -> (as V.! n) `op` (bs V.! n))
+elementwise op (PointSet as) (PointSet bs) = 
+    if len == 9
+        then PointSet $ V.fromList [(as V.! 0) `op` (bs V.! 0), (as V.! 1) `op` (bs V.! 1), (as V.! 2) `op` (bs V.! 2)]
+        else PointSet $ V.generate len (\n -> (as V.! n) `op` (bs V.! n))
+  where
+    len = V.length as
 
 union :: PointSet -> PointSet -> PointSet
 union = elementwise (.|.)
