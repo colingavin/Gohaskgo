@@ -3,9 +3,10 @@
 PROG=uct_test
 OPTS=test_data/standard_uct
 
+cabal clean
 cabal configure --enable-executable-profiling
 cabal build
-dist/build/${PROG}/${PROG} ${OPTS} +RTS -p
+dist/build/${PROG}/${PROG} ${OPTS} +RTS -P
 
 OUT=prof/${PROG}_$(date +"%m-%d_%H_%M").prof
 
