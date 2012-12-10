@@ -30,7 +30,7 @@ makeRandomMove :: IncompleteGame -> RVar AnyGame
 makeRandomMove gm | getLastWasPass gm && shouldPassToWin gm = return $ pass gm
 makeRandomMove gm | shouldResign gm = return $ Left $ resign gm
 makeRandomMove gm = do
-    plays <- mapM ((flip makeRandomMoveFrom gm) . PS.toList) $ reverse $ classifyMoves (emptyPoints gm) gm
+    plays <- mapM (flip makeRandomMoveFrom gm) $ reverse $ classifyMoves (emptyPoints gm) gm
     return $ case foldr mplus Nothing plays of
         Just (gm, _) -> Right gm
         Nothing -> pass gm

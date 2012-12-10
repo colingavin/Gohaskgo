@@ -21,8 +21,8 @@ import Gohaskgo.Model.Position
 
 -- Access point to playout heurisitcs
 -- Given a set of open points and a game, groups the moves into good, fair, and bad, to be tried in order
-classifyMoves :: PointSet -> IncompleteGame -> [PointSet]
-classifyMoves ps gm = map (PS.fromList n) $ groupWith (\p -> scores ! p) $ PS.toList ps
+classifyMoves :: PointSet -> IncompleteGame -> [[Point]]
+classifyMoves ps gm = groupWith (\p -> scores ! p) $ PS.toList ps
   where
     scores = snd $ runState (combinedHeuristics ps gm) emptyScores
     emptyScores = array ((1, 1), (n, n)) [((x, y), 0) | x <- [1..n], y <- [1..n]]
