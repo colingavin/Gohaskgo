@@ -21,8 +21,9 @@ import Gohaskgo.Model.Position
 
 -- Access point to playout heurisitcs
 -- Given a set of open points and a game, groups the moves into good, fair, and bad, to be tried in order
+-- This drops any point which scores less than minScore
 classifyMoves :: PointSet -> IncompleteGame -> [[Point]]
-classifyMoves ps gm = groupWith (\p -> scores ! p) $ PS.toList ps
+classifyMoves ps gm = tail $ groupWith (\p -> scores ! p) $ PS.toList ps
   where
     scores = snd $ runState (combinedHeuristics ps gm) emptyScores
     emptyScores = array ((1, 1), (n, n)) [((x, y), 0) | x <- [1..n], y <- [1..n]]
@@ -93,7 +94,7 @@ escapeHeuristic ps gm = adjustScores 1 $ PS.intersection escapePoints ps
 
 -- Heuristic to avoid playing in own eyes
 eyesHeuristic :: PlayoutHeuristic
-eyesHeuristic ps gm = adjustScores (-1) eyes
+eyesHeuristic ps gm = adjustScores (-1000) eyes
   where
     eyes = PS.filter (isEye player pos) liberties
     liberties = Set.foldr (PS.union . getLiberties) (PS.empty $ PS.width ps) (chainsForPlayer player pos)
