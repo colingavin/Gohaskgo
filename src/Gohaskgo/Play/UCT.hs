@@ -56,7 +56,7 @@ uctSearch tree gm iters playouts = do
     -- Find the node at the bottom of the tree to expand
     let (toExpand, gameAtBottom) = searchDown tree gm
     -- Randomly expand it using heuristics
-    let (newNode, expandedGame) = expandNode toExpand gameAtBottom
+    (newNode, expandedGame) <- expandNode toExpand gameAtBottom
     -- Preform the specified number of playouts on the new node
     wins <- playoutNode newNode expandedGame playouts
     -- Propogate the results back up the tree and repeat
@@ -93,26 +93,22 @@ uctScore node parentVisits = wins / visits + sqrt(2 * log(fromIntegral parentVis
     visits = fromIntegral $ getVisits node
 
 -- Add a node at the bottom of the tree by playing a random move, directed by playout heuristics
-expandNode :: UCTZipper -> IncompleteGame -> (UCTZipper, IncompleteGame)
-expandNode zipper gm = case firstAvaliableMove (PS.toList $ getAvailableMoves node) of
-    -- If there was no move to make, set avaliable moves to {}
-    Nothing ->
-        let node' = setAvaliableMoves (PS.empty $ PS.width $ getAvailableMoves node) node
-            zipper' = setLabel node' zipper
-        in (zipper', gm)
-    -- Otherwise, create the new search node with that move and append it to the bottom of the tree
-    Just (ng, pt) ->
-        let newChild = SearchNode (opponent $ getPlayer node) pt 0 0 (emptyPoints ng)
-            node' = setAvaliableMoves (PS.delete pt $ getAvailableMoves node) node
-            zipper' = setLabel node' zipper
-            zipper'' = insert (return newChild) $ children zipper'
-        in (zipper'', ng)
+expandNode :: UCTZipper -> IncompleteGame -> RVar (UCTZipper, IncompleteGame)
+expandNode zipper gm = do
+    mMove <- makeRandomMoveFrom (PS.toList $ getAvailableMoves node) gm
+    case mMove of
+        Nothing -> do
+            let node' = setAvaliableMoves (PS.empty $ PS.width $ getAvailableMoves node) node
+                zipper' = setLabel node' zipper
+            return (zipper', gm)
+        Just (ng, pt) -> do
+            let newChild = SearchNode (opponent $ getPlayer node) pt 0 0 (emptyPoints ng)
+                node' = setAvaliableMoves (PS.delete pt $ getAvailableMoves node) node
+                zipper' = setLabel node' zipper
+                zipper'' = insert (return newChild) $ children zipper'
+            return $ trace ("Move:" ++ show pt) (zipper'', ng)
   where
     node = label zipper
-    firstAvaliableMove [] = Nothing
-    firstAvaliableMove (x:xs) = case play gm x of
-        Right ng -> Just (ng, x)
-        Left _ -> firstAvaliableMove xs
 
 -- Playout a given node some number of times, returning the number of wins
 playoutNode :: UCTZipper -> IncompleteGame -> Int -> RVar Int
