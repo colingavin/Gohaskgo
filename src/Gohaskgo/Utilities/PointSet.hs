@@ -155,7 +155,9 @@ filter f (PointSet ps) = PointSet $ V.modify filterMod ps
 foldr :: (Point -> a -> a) -> a -> PointSet -> a
 foldr f a (PointSet ps) = V.ifoldr eachInBlock a ps
   where
-    eachInBlock idx block curr = Prelude.foldr (\n c -> if testBit block n then f (pointFromIndex $ 32*idx + n) c else c) curr [0..31]
+    eachInBlock idx block curr = if block /= 0
+        then Prelude.foldr (\n c -> if testBit block n then f (pointFromIndex $ 32*idx + n) c else c) curr [0..31]
+        else curr
 
 -- Modification
 insert :: Point -> PointSet -> PointSet

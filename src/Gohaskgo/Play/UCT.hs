@@ -106,7 +106,7 @@ expandNode zipper gm = do
                 node' = setAvaliableMoves (PS.delete pt $ getAvailableMoves node) node
                 zipper' = setLabel node' zipper
                 zipper'' = insert (return newChild) $ children zipper'
-            return $ trace ("Move:" ++ show pt) (zipper'', ng)
+            return (zipper'', ng)
   where
     node = label zipper
 
