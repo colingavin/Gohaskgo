@@ -22,3 +22,29 @@ executable uct_test
                         Gohaskgo.Model.Position,
                         Gohaskgo.Model.Zobrist
     ghc-prof-options:   -auto-all
+
+flag console_app
+    description: Build the interactive console app.
+    default: False
+
+executable console_play
+    if flag(console_app)
+        buildable:      True
+    else
+        buildable:      False
+    main-is:            ConsolePlay.hs
+    hs-source-dirs:     src
+    build-depends:      base, mtl, array, containers, vector, parsec, rvar, random-fu, mwc-random, random-source, rosezipper, bitvec
+    other-modules:      Gohaskgo.Utilities.AsciiBoardParser, 
+                        Gohaskgo.Utilities.General,
+                        Gohaskgo.Utilities.PointSet,
+                        Gohaskgo.Playout.Base,
+                        Gohaskgo.Playout.Heuristics,
+                        Gohaskgo.Playout.PositionAnalysis,
+                        Gohaskgo.Model.Base,
+                        Gohaskgo.Model.Chain,
+                        Gohaskgo.Model.Gameplay,
+                        Gohaskgo.Model.Point,
+                        Gohaskgo.Model.Position,
+                        Gohaskgo.Model.Zobrist
+    ghc-prof-options:   -auto-all
